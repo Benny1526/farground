@@ -1,0 +1,30 @@
+{
+	"schemaVersion": 1,
+	"id": "farground",
+	"version": "${version}",
+	"name": "Farground",
+	"description": "Fast background terrain generator for Voxy and Distant Horizons. Fills in distant terrain around you, nearest first, and stays out of the way while you play. Singleplayer, LAN, and dedicated servers.",
+	"authors": ["BennyPlayz"],
+	"license": "MIT",
+	"icon": "assets/farground/icon.png",
+	"environment": "*",
+	"accessWidener": "farground.accesswidener",
+	"entrypoints": {
+		"main": ["dev.farground.Farground"],
+		"client": ["dev.farground.FargroundClient"],
+		"modmenu": ["dev.farground.FargroundModMenu"]
+	},
+	"depends": {
+		"fabricloader": ">=0.18.0",
+		"minecraft": "${minecraft_range}",
+		"java": ">=25",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"voxy": ">=0.2.17-alpha",
+		"distanthorizons": ">=3.3.3",
+		"modmenu": "*",
+		"cloth-config": "*",
+		"voxyserver": "*"
+	}
+}

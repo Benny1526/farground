@@ -1,0 +1,5 @@
+accessWidener v1 official
+
+# Non-blocking chunk request. The public getChunkFuture() blocks the server thread until the
+# chunk is finished when called from it; this is the method it wraps, which just schedules work.
+accessible method net/minecraft/server/level/ServerChunkCache getChunkFutureMainThread (IILnet/minecraft/world/level/chunk/status/ChunkStatus;Z)Ljava/util/concurrent/CompletableFuture;

@@ -1,0 +1,79 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+// Load the library versions for the chosen Minecraft version (-Pmc=26.2 or -Pmc=26.3).
+def mcTarget = project.property('mc').toString()
+def versionFile = file("versions/${mcTarget}.properties")
+if (!versionFile.exists()) {
+	throw new GradleException("No versions/${mcTarget}.properties. Supported: " + file('versions').list().collect { it - '.properties' }.sort().join(', '))
+}
+def v = new Properties()
+versionFile.withInputStream { v.load(it) }
+
+version = "${project.version}+${mcTarget}"
+
+loom {
+	accessWidenerPath = file("src/main/resources/farground.accesswidener")
+}
+base.archivesName = 'farground'
+
+repositories {
+	exclusiveContent {
+		forRepository {
+			maven {
+				name = 'Modrinth'
+				url = 'https://api.modrinth.com/maven'
+			}
+		}
+		filter {
+			includeGroup 'maven.modrinth'
+		}
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${v.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${v.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${v.fabric_api_version}"
+
+	// Only compiled against; never bundled into our jar. Voxy and Distant Horizons are each
+	// optional (Farground needs at least one of them). Mod Menu and Cloth Config are optional
+	// at runtime (they only power the settings screen).
+	compileOnly "maven.modrinth:voxy:${v.voxy_version}"
+	compileOnly "maven.modrinth:modmenu:${v.modmenu_version}"
+	compileOnly "maven.modrinth:cloth-config:${v.cloth_version}"
+	compileOnly "maven.modrinth:distanthorizons:${v.dh_version}"
+
+	// Only used by `gradlew runClient` for testing. Pass -PnoDevMods to test with
+	// your own jars in run/mods instead.
+	if (!project.hasProperty('noDevMods')) {
+		localRuntime "maven.modrinth:voxy:${v.voxy_version}"
+		localRuntime "maven.modrinth:sodium:${v.sodium_version}"
+	}
+}
+
+processResources {
+	def props = [version: project.version, minecraft_range: v.minecraft_range]
+	inputs.properties props
+
+	filesMatching("fabric.mod.json") {
+		expand props
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+	it.options.encoding = 'UTF-8'
+}
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+jar {
+	from("LICENSE") {
+		rename { "${it}_farground" }
+	}
+}
