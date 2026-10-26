@@ -41,3 +41,6 @@ replay_*.log
 
 # built jars (published as GitHub Release downloads, not committed)
 dist/
+
+# local upload kits (copies of jars and texts for CurseForge/Modrinth)
+publishing/*-kit/
