@@ -13,6 +13,7 @@
    Voxy and Distant Horizons."
 3. Logo: upload `logo-400.png`.
 4. Categories: Performance (main), World Gen, Utility. License: MIT.
+   Source / issues links: https://github.com/Benny1526/farground
 5. Description: switch the editor to Markdown and paste `MODRINTH.md`, then add this
    section near the top:
 

@@ -51,3 +51,6 @@ display shows progress; `/farground` shows details.
 
 ## Versions
 Minecraft 26.2 and 26.3, Fabric. Java 25. Voxy 0.2.19+ or Distant Horizons 3.3.3+.
+
+## Source
+[github.com/Benny1526/farground](https://github.com/Benny1526/farground) (MIT). Bug reports and translations welcome there.

@@ -5,8 +5,8 @@
 3. Description: paste `MODRINTH.md`.
 4. Categories: Optimization, Worldgen, Utility. Environment: client and server
    (works on either; required on whichever side generates).
-5. License: MIT. Source: your GitHub repo (optional; `.github/workflows/build.yml` builds
-   both versions there).
+5. License: MIT. Source: https://github.com/Benny1526/farground . Issues:
+   https://github.com/Benny1526/farground/issues
 6. **Upload a version** for each jar in `dist/`:
    - `farground-1.7.0+26.3.jar` → game version 26.3, loader Fabric
    - `farground-1.7.0+26.2.jar` → game version 26.2, loader Fabric
