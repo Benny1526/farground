@@ -5,6 +5,9 @@ A Fabric mod for Minecraft 26.2 and 26.3 that fills in distant terrain for
 in the background, nearest first, while staying out of your way. Works in singleplayer, when
 hosting a LAN world, and on dedicated servers.
 
+**Download:** [GitHub releases](https://github.com/Benny1526/farground/releases) ·
+[CurseForge](https://www.curseforge.com/projects/1767570) (in review) · Modrinth (coming soon)
+
 ## Requirements
 | | 26.2 | 26.3 |
 |---|---|---|
