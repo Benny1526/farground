@@ -6,7 +6,7 @@ in the background, nearest first, while staying out of your way. Works in single
 hosting a LAN world, and on dedicated servers.
 
 **Download:** [GitHub releases](https://github.com/Benny1526/farground/releases) ·
-[CurseForge](https://www.curseforge.com/projects/1767570) (in review) · Modrinth (coming soon)
+[CurseForge](https://www.curseforge.com/projects/1767570) · [Modrinth](https://modrinth.com/mod/farground) (both in review)
 
 ## Requirements
 | | 26.2 | 26.3 |
