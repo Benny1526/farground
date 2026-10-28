@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.1
+- **Fixed:** desktops could stay "paused on battery". Farground now asks the operating system
+  whether the computer itself is on battery (on Windows, the same answer as the taskbar battery
+  icon). Desktops, UPS backup units and the batteries in wireless mice, keyboards and headsets
+  no longer count. When the state can't be read, Farground treats the computer as plugged in.
+
 ## 1.7.0
 - **Automatic radius:** Farground now generates exactly as far as your LOD mod draws,
   read from Voxy's or Distant Horizons' render distance (the larger one if you have both),
