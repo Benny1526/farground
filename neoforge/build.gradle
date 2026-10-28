@@ -1,0 +1,124 @@
+plugins {
+	id 'java-library'
+	id 'net.neoforged.moddev' version '2.0.148'
+}
+
+// NeoForge build of Farground. The mod's code is shared with the Fabric build in the folder
+// above (../src); only the small loader-specific classes in this folder are NeoForge's own.
+
+def mcTarget = project.property('mc').toString()
+def versionFile = file("versions/${mcTarget}.properties")
+if (!versionFile.exists()) {
+	throw new GradleException("No versions/${mcTarget}.properties. Supported: " + file('versions').list().collect { it - '.properties' }.sort().join(', '))
+}
+def v = new Properties()
+versionFile.withInputStream { v.load(it) }
+
+// The mod version comes from the Fabric build's gradle.properties, so both stay in step.
+def root = new Properties()
+file('../gradle.properties').withInputStream { root.load(it) }
+version = "${root.getProperty('version')}+${mcTarget}"
+base.archivesName = 'farground-neoforge'
+
+sourceSets {
+	main {
+		java {
+			srcDir '../src/main/java'
+			exclude 'dev/farground/fabric/**'
+		}
+		resources {
+			srcDir '../src/main/resources'
+			exclude 'fabric.mod.json', 'farground.accesswidener'
+		}
+	}
+}
+
+neoForge {
+	version = v.neoforge_version
+	neoFormRuntime {
+		// Windows security scanning briefly locks each freshly written file, which breaks the
+		// setup tool's move-into-cache step. Without its cache nothing is moved.
+		enableCache = false
+	}
+	accessTransformers = files('src/main/resources/META-INF/accesstransformer.cfg')
+
+	runs {
+		client {
+			client()
+		}
+		server {
+			server()
+			programArgument '--nogui'
+		}
+	}
+
+	mods {
+		farground {
+			sourceSet sourceSets.main
+		}
+	}
+}
+
+repositories {
+	maven {
+		name = 'Fabric'
+		url = 'https://maven.fabricmc.net/'
+		content {
+			includeGroup 'net.fabricmc'
+		}
+	}
+	exclusiveContent {
+		forRepository {
+			maven {
+				name = 'Modrinth'
+				url = 'https://api.modrinth.com/maven'
+			}
+		}
+		filter {
+			includeGroup 'maven.modrinth'
+		}
+	}
+}
+
+dependencies {
+	// Only compiled against; never bundled. Distant Horizons is what Farground feeds on
+	// NeoForge; Cloth Config is optional and only powers the settings screen. Voxy is only
+	// here so the shared code compiles (Voxy itself is Fabric-only).
+	compileOnly "maven.modrinth:distanthorizons:${v.dh_version}"
+	compileOnly "maven.modrinth:cloth-config:${v.cloth_version}"
+	compileOnly "maven.modrinth:voxy:${v.voxy_version}"
+	// Voxy's classes refer to Fabric's loader, so it's needed to compile too (never bundled).
+	compileOnly "net.fabricmc:fabric-loader:0.20.1"
+}
+
+processResources {
+	def props = [version: project.version, neoforge_range: v.neoforge_range, minecraft_range: v.minecraft_range]
+	inputs.properties props
+	filesMatching('META-INF/neoforge.mods.toml') {
+		expand props
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+	it.options.encoding = 'UTF-8'
+}
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+}
+
+jar {
+	from('../LICENSE') {
+		rename { "${it}_farground" }
+	}
+}
+
+// The asset download step asks for Java 21 by default; Minecraft 26.x needs Java 25, so use that.
+tasks.matching { it.name == 'downloadAssets' }.configureEach {
+	it.javaExecutable = javaToolchains.launcherFor {
+		languageVersion = JavaLanguageVersion.of(25)
+	}.map { l -> l.executablePath.asFile.absolutePath }
+}

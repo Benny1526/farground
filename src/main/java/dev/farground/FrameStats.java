@@ -49,6 +49,16 @@ public final class FrameStats {
 		return p99 > median * 2.5 && p99 - median > 20_000_000L;
 	}
 
+	/**
+	 * True if the frame rate has dropped enough to feel: below 85% of its recent average AND each
+	 * frame taking at least 1.5 ms longer. At high frame rates (common on desktops) a 15% swing
+	 * is a fraction of a millisecond and can't be felt, so it isn't counted. Public for testing.
+	 */
+	public static boolean isDip(double fps, double averageFps) {
+		if (fps <= 0 || averageFps <= 0) return false;
+		return fps < averageFps * 0.85 && 1000.0 / fps - 1000.0 / averageFps >= 1.5;
+	}
+
 	/** Was there a stutter in the last couple of seconds? */
 	public static boolean recentStutter() {
 		long t = lastStutterNanos;

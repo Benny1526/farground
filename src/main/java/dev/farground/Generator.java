@@ -136,17 +136,15 @@ public final class Generator {
 		this.limit = cfg.maxConcurrent;
 		this.fpsLimit = cfg.maxConcurrent;
 		this.radiusNow = cfg.radiusChunks;
-		var loader = net.fabricmc.loader.api.FabricLoader.getInstance();
-		this.useVoxy = !serverMode && loader.isModLoaded("voxy");
-		this.useDh = loader.isModLoaded("distanthorizons");
+		this.useVoxy = !serverMode && Platform.isModLoaded("voxy");
+		this.useDh = Platform.isModLoaded("distanthorizons");
 		refreshRadius();
 	}
 
 	/** True if at least one LOD mod is installed to receive what Farground generates. */
 	public static boolean anyLodModInstalled(boolean serverMode) {
-		var loader = net.fabricmc.loader.api.FabricLoader.getInstance();
-		return loader.isModLoaded("distanthorizons")
-				|| (serverMode ? loader.isModLoaded("voxyserver") : loader.isModLoaded("voxy"));
+		return Platform.isModLoaded("distanthorizons")
+				|| (serverMode ? Platform.isModLoaded("voxyserver") : Platform.isModLoaded("voxy"));
 	}
 
 	/** "Voxy", "Distant Horizons" or "Voxy and Distant Horizons", for messages. */
@@ -329,7 +327,7 @@ public final class Generator {
 			fpsLimit = Math.max(floor, fpsLimit * 2 / 3);
 			lastStutterTick = ticks;
 			stutterBackoffs++;
-		} else if (fps < fpsAverage * 0.85) {
+		} else if (FrameStats.isDip(fps, fpsAverage)) {
 			fpsLimit = Math.max(floor, fpsLimit * 3 / 4);
 		} else if (ticks - lastStutterTick > 3 * SECOND) {
 			fpsLimit = Math.min(cfg.maxConcurrent, fpsLimit + Math.max(1, fpsLimit / 8));

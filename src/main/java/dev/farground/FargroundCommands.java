@@ -37,7 +37,7 @@ public final class FargroundCommands {
 		out.add(indent(tr("farground.status.session", g.generated, g.generatedFull, g.failed, n(g.recentRate))));
 		out.add(indent(tr("farground.status.limits", g.lastInFlight, g.lastLimit, cfg.maxConcurrent, cfg.activeConcurrent, n1(g.lastMspt))));
 		Object auto = cfg.fullDetailRadius >= 0 ? ""
-				: net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("voxy") ? tr("farground.status.auto_voxy")
+				: Platform.isModLoaded("voxy") ? tr("farground.status.auto_voxy")
 				: tr("farground.status.auto");
 		out.add(indent(tr("farground.status.full_detail", level == null ? g.fullDetailNow : g.fullDetailFor(level), auto,
 				g.stutterBackoffs > 0 ? tr("farground.status.stutters", g.stutterBackoffs) : "")));

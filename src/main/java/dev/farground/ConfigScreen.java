@@ -21,7 +21,7 @@ import java.util.Optional;
  * impact (Low / Medium / High) that follows the value currently picked. All text comes from
  * the language files (farground.config.*).
  */
-final class ConfigScreen {
+public final class ConfigScreen {
 	private ConfigScreen() {}
 
 	private enum Impact {
@@ -81,7 +81,7 @@ final class ConfigScreen {
 		return Tr.str(P + "unit.minutes_seconds", s / 60, s % 60);
 	}
 
-	static Screen create(Screen parent) {
+	public static Screen create(Screen parent) {
 		FargroundConfig c = Farground.config();
 		FargroundConfig d = new FargroundConfig(); // defaults
 		ConfigBuilder b = ConfigBuilder.create().setParentScreen(parent).setTitle(label("title"));

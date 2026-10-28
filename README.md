@@ -1,21 +1,34 @@
 # Farground
 
-A Fabric mod for Minecraft 26.2 and 26.3 that fills in distant terrain for
+A Fabric and NeoForge mod for Minecraft 26.2 and 26.3 that fills in distant terrain for
 [Voxy](https://modrinth.com/mod/voxy) or [Distant Horizons](https://modrinth.com/mod/distanthorizons)
 in the background, nearest first, while staying out of your way. Works in singleplayer, when
 hosting a LAN world, and on dedicated servers.
 
 **Download:** [GitHub releases](https://github.com/Benny1526/farground/releases) ·
-[CurseForge](https://www.curseforge.com/projects/1767570) · [Modrinth](https://modrinth.com/mod/farground) (both in review)
+[CurseForge](https://www.curseforge.com/projects/1767570) · [Modrinth](https://modrinth.com/mod/farground)
 
 ## Requirements
+**Fabric**
 | | 26.2 | 26.3 |
 |---|---|---|
-| Jar | `farground-1.7.0+26.2.jar` | `farground-1.7.0+26.3.jar` |
+| Jar | `farground-1.8.0+26.2.jar` | `farground-1.8.0+26.3.jar` |
 | Fabric Loader | 0.18+ | 0.18+ |
 | LOD mod (one or both) | Voxy 0.2.19-beta, or Distant Horizons 3.3.3 | Voxy 0.2.20-beta, or Distant Horizons 3.3.4 (tested) |
 | Optional | Mod Menu + Cloth Config (settings screen) | same |
 | Dedicated server | Distant Horizons, or Voxy Server (+ Voxy, Sodium) | same |
+
+**NeoForge**
+| | 26.2 | 26.3 |
+|---|---|---|
+| Jar | `farground-neoforge-1.8.0+26.2.jar` | `farground-neoforge-1.8.0+26.3.jar` |
+| NeoForge | 26.2.0.93+ | 26.3.0.99+ (tested) |
+| LOD mod | Distant Horizons 3.3.3 | Distant Horizons 3.3.4 (tested) |
+| Optional | Cloth Config (settings screen, under Mods → Farground → Config) | same |
+| Dedicated server | Distant Horizons | same |
+
+Voxy is Fabric-only, so on NeoForge Farground works with Distant Horizons. There is no Forge
+version: no LOD mod runs on Forge for Minecraft 26.x.
 
 Without a LOD mod, Farground stays idle and says so.
 
@@ -162,12 +175,20 @@ Farground loads chunks you have already explored straight from disk (no regenera
 running it in an old world imports that terrain into Voxy too.
 
 ## Building
+Fabric:
 ```
 gradlew build -Pmc=26.2
 gradlew build -Pmc=26.3
 ```
-The jars end up in `build/libs/`. Library versions for each Minecraft version are in
-`versions/<mc>.properties`.
+NeoForge (shares all the code in `src/`; only the loader hookup lives in `neoforge/src/`):
+```
+gradlew -p neoforge build -Pmc=26.2
+gradlew -p neoforge build -Pmc=26.3
+```
+The jars end up in `build/libs/` and `neoforge/build/libs/`. Library versions for each
+Minecraft version are in `versions/<mc>.properties` and `neoforge/versions/<mc>.properties`.
+Code that only one loader needs goes in `src/main/java/dev/farground/fabric/` or
+`neoforge/src/`; everything else talks to the loader through `Platform`.
 
 If Gradle fails with "Unable to establish loopback connection" on Windows, point Java's local
 sockets somewhere outside the temp folder first:

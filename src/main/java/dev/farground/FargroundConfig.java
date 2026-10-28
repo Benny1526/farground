@@ -2,7 +2,6 @@ package dev.farground;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -13,7 +12,9 @@ import java.nio.file.Path;
 /** Settings stored in config/farground.json. Every field can also be changed in the Mod Menu screen. */
 public final class FargroundConfig {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-	private static final Path FILE = FabricLoader.getInstance().getConfigDir().resolve("farground.json");
+	private static Path file() {
+		return Platform.configDir().resolve("farground.json");
+	}
 
 	public enum HudMode { OFF, WHILE_GENERATING, ALWAYS }
 	public enum HudCorner { TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT }
@@ -110,11 +111,11 @@ public final class FargroundConfig {
 
 	public static FargroundConfig load() {
 		FargroundConfig cfg = null;
-		if (Files.exists(FILE)) {
-			try (Reader r = Files.newBufferedReader(FILE)) {
+		if (Files.exists(file())) {
+			try (Reader r = Files.newBufferedReader(file())) {
 				cfg = GSON.fromJson(r, FargroundConfig.class);
 			} catch (Exception e) {
-				Farground.LOG.warn("Could not read {}, using defaults", FILE, e);
+				Farground.LOG.warn("Could not read {}, using defaults", file(), e);
 			}
 		}
 		if (cfg == null) cfg = new FargroundConfig();
@@ -154,12 +155,12 @@ public final class FargroundConfig {
 
 	public void save() {
 		try {
-			Files.createDirectories(FILE.getParent());
-			try (Writer w = Files.newBufferedWriter(FILE)) {
+			Files.createDirectories(file().getParent());
+			try (Writer w = Files.newBufferedWriter(file())) {
 				GSON.toJson(this, w);
 			}
 		} catch (IOException e) {
-			Farground.LOG.warn("Could not save {}", FILE, e);
+			Farground.LOG.warn("Could not save {}", file(), e);
 		}
 	}
 }

@@ -10,9 +10,9 @@
 	"environment": "*",
 	"accessWidener": "farground.accesswidener",
 	"entrypoints": {
-		"main": ["dev.farground.Farground"],
-		"client": ["dev.farground.FargroundClient"],
-		"modmenu": ["dev.farground.FargroundModMenu"]
+		"main": ["dev.farground.fabric.FargroundFabric"],
+		"client": ["dev.farground.fabric.FargroundFabricClient"],
+		"modmenu": ["dev.farground.fabric.FargroundModMenu"]
 	},
 	"depends": {
 		"fabricloader": ">=0.18.0",

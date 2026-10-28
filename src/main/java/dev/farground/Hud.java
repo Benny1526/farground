@@ -1,16 +1,14 @@
 package dev.farground;
 
-import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 /** A small "Farground 42% · 95/s" line in a corner of the screen. */
-public final class Hud implements HudElement {
+public final class Hud {
 	private static final int MARGIN = 4;
 	private static final int PAD = 3;
 
-	@Override
 	public void extractRenderState(GuiGraphicsExtractor g, DeltaTracker delta) {
 		FrameStats.frame(); // called every frame: feeds the stutter detector
 		Minecraft mc = Minecraft.getInstance();

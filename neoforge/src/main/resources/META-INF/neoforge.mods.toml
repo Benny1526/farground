@@ -1,0 +1,44 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "MIT"
+issueTrackerURL = "https://github.com/Benny1526/farground/issues"
+
+[[mods]]
+modId = "farground"
+version = "${version}"
+displayName = "Farground"
+authors = "BennyPlayz"
+iconFile = "assets/farground/icon.png"
+displayURL = "https://github.com/Benny1526/farground"
+description = '''Fast background terrain generator for Distant Horizons. Fills in distant terrain around you, nearest first, and stays out of the way while you play. Singleplayer, LAN, and dedicated servers.'''
+
+[[accessTransformers]]
+file = "META-INF/accesstransformer.cfg"
+
+[[dependencies.farground]]
+modId = "neoforge"
+type = "required"
+versionRange = "${neoforge_range}"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.farground]]
+modId = "minecraft"
+type = "required"
+versionRange = "${minecraft_range}"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.farground]]
+modId = "distanthorizons"
+type = "optional"
+versionRange = "[3.3.3,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.farground]]
+modId = "cloth_config"
+type = "optional"
+versionRange = "*"
+ordering = "NONE"
+side = "CLIENT"

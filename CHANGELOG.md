@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.8.0
+- **NeoForge support** (26.2 and 26.3) with Distant Horizons. Same features, settings and
+  commands as on Fabric; the settings screen needs Cloth Config. Tested on NeoForge 26.3.0.99
+  with Distant Horizons 3.3.4: about 180 chunks a second handed to DH. Voxy is Fabric-only, so
+  it isn't supported on NeoForge, and there is no Forge version (no LOD mod runs on Forge for
+  26.x).
+- **Faster on high-refresh desktops:** Farground slowed down whenever the frame rate dipped 15%
+  below its average. At 200+ FPS that happens all the time without being noticeable, so it now
+  only counts a dip that also makes each frame at least 1.5 ms slower.
+
 ## 1.7.1
 - **Fixed:** desktops could stay "paused on battery". Farground now asks the operating system
   whether the computer itself is on battery (on Windows, the same answer as the taskbar battery

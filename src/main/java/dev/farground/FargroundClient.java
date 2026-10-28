@@ -1,25 +1,25 @@
 package dev.farground;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
-import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
-import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 
-import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.argument;
-import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal;
+/**
+ * Client-only parts shared by Fabric and NeoForge: frame-rate signals, the singleplayer
+ * /farground command, and reading the LOD mod's settings. Each loader's client entry point
+ * calls {@link #init()} and registers {@link #commandTree} and the {@link Hud}.
+ */
+public final class FargroundClient {
+	private FargroundClient() {}
 
-/** Client-only parts: frame-rate signals, the HUD, and the singleplayer /farground command. */
-public final class FargroundClient implements ClientModInitializer {
-	@Override
-	public void onInitializeClient() {
+	public static void init() {
 		Farground.signals = new ClientSignals() {
 			@Override
 			public boolean active() {
@@ -52,55 +52,65 @@ public final class FargroundClient implements ClientModInitializer {
 				return lodRenderDistance();
 			}
 		};
+	}
 
-		HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("farground", "status"), new Hud());
+	/** How each loader's client command source shows a message: normal feedback or an error. */
+	public record Replies<S>(BiConsumer<S, Component> feedback, BiConsumer<S, Component> error) {}
 
-		ClientCommandRegistrationCallback.EVENT.register((dispatcher, ctx) -> dispatcher.register(
-				literal("farground")
-						.executes(FargroundClient::status)
-						.then(literal("status").executes(FargroundClient::status))
-						.then(literal("pause").executes(c -> onServer(c, g -> { g.paused = true; return Tr.tr("farground.cmd.paused"); })))
-						.then(literal("resume").executes(c -> onServer(c, g -> { g.paused = false; return Tr.tr("farground.cmd.resumed"); })))
-						.then(literal("radius")
-								.then(literal("auto").executes(c -> onServer(c, FargroundCommands::radiusAuto)))
-								.then(argument("chunks", IntegerArgumentType.integer(8, 4096))
-								.executes(c -> onServer(c, g -> FargroundCommands.radius(g, IntegerArgumentType.getInteger(c, "chunks"))))))
-						.then(literal("fulldetail")
-								.then(literal("auto").executes(c -> onServer(c, FargroundCommands::fullDetailAuto)))
-								.then(argument("chunks", IntegerArgumentType.integer(0, 4096))
-								.executes(c -> onServer(c, g -> FargroundCommands.fullDetail(g, IntegerArgumentType.getInteger(c, "chunks"))))))
-						.then(literal("speed").then(argument("chunks", IntegerArgumentType.integer(1, 256))
-								.executes(c -> onServer(c, g -> FargroundCommands.speed(g, IntegerArgumentType.getInteger(c, "chunks"))))))
-						.then(literal("movingspeed").then(argument("chunks", IntegerArgumentType.integer(0, 256))
-								.executes(c -> onServer(c, g -> FargroundCommands.movingSpeed(IntegerArgumentType.getInteger(c, "chunks"))))))
-						.then(literal("autotune")
-								.executes(c -> onServer(c, FargroundCommands::autotune))
-								.then(literal("cancel").executes(c -> onServer(c, FargroundCommands::autotuneCancel))))
-						.then(literal("prune")
-								.executes(c -> onServer(c, g -> FargroundCommands.prune()))
-								.then(literal("cancel").executes(c -> onServer(c, g -> FargroundCommands.pruneCancel()))))
-						.then(literal("hud")
-								.then(literal("off").executes(c -> hud(c, FargroundConfig.HudMode.OFF)))
-								.then(literal("generating").executes(c -> hud(c, FargroundConfig.HudMode.WHILE_GENERATING)))
-								.then(literal("always").executes(c -> hud(c, FargroundConfig.HudMode.ALWAYS))))
-						.then(literal("area")
-								.then(literal("cancel").executes(c -> onServer(c, FargroundCommands::cancelAreas)))
-								.then(argument("x", IntegerArgumentType.integer()).then(argument("z", IntegerArgumentType.integer())
-										.then(argument("radius", IntegerArgumentType.integer(1, 2048)).executes(c -> {
-											int x = IntegerArgumentType.getInteger(c, "x");
-											int z = IntegerArgumentType.getInteger(c, "z");
-											int r = IntegerArgumentType.getInteger(c, "radius");
-											return onServer(c, g -> {
-												ServerLevel level = currentLevel();
-												return level == null ? Tr.tr("farground.no_world") : FargroundCommands.area(g, level, x, z, r);
-											});
-										})))))
-						.then(literal("reset").executes(c -> onServer(c, g -> {
-							ServerLevel level = currentLevel();
-							if (level != null) g.reset(level);
-							return Tr.tr("farground.cmd.reset");
-						})))
-		));
+	private static <S> LiteralArgumentBuilder<S> literal(String name) {
+		return LiteralArgumentBuilder.literal(name);
+	}
+
+	private static <S> RequiredArgumentBuilder<S, Integer> argument(String name, IntegerArgumentType type) {
+		return RequiredArgumentBuilder.argument(name, type);
+	}
+
+	/** The singleplayer /farground command, for any loader's client command source type. */
+	public static <S> LiteralArgumentBuilder<S> commandTree(Replies<S> r) {
+		return FargroundClient.<S>literal("farground")
+				.executes(c -> status(c, r))
+				.then(FargroundClient.<S>literal("status").executes(c -> status(c, r)))
+				.then(FargroundClient.<S>literal("pause").executes(c -> onServer(c, r, g -> { g.paused = true; return Tr.tr("farground.cmd.paused"); })))
+				.then(FargroundClient.<S>literal("resume").executes(c -> onServer(c, r, g -> { g.paused = false; return Tr.tr("farground.cmd.resumed"); })))
+				.then(FargroundClient.<S>literal("radius")
+						.then(FargroundClient.<S>literal("auto").executes(c -> onServer(c, r, FargroundCommands::radiusAuto)))
+						.then(FargroundClient.<S>argument("chunks", IntegerArgumentType.integer(8, 4096))
+								.executes(c -> onServer(c, r, g -> FargroundCommands.radius(g, IntegerArgumentType.getInteger(c, "chunks"))))))
+				.then(FargroundClient.<S>literal("fulldetail")
+						.then(FargroundClient.<S>literal("auto").executes(c -> onServer(c, r, FargroundCommands::fullDetailAuto)))
+						.then(FargroundClient.<S>argument("chunks", IntegerArgumentType.integer(0, 4096))
+								.executes(c -> onServer(c, r, g -> FargroundCommands.fullDetail(g, IntegerArgumentType.getInteger(c, "chunks"))))))
+				.then(FargroundClient.<S>literal("speed").then(FargroundClient.<S>argument("chunks", IntegerArgumentType.integer(1, 256))
+						.executes(c -> onServer(c, r, g -> FargroundCommands.speed(g, IntegerArgumentType.getInteger(c, "chunks"))))))
+				.then(FargroundClient.<S>literal("movingspeed").then(FargroundClient.<S>argument("chunks", IntegerArgumentType.integer(0, 256))
+						.executes(c -> onServer(c, r, g -> FargroundCommands.movingSpeed(IntegerArgumentType.getInteger(c, "chunks"))))))
+				.then(FargroundClient.<S>literal("autotune")
+						.executes(c -> onServer(c, r, FargroundCommands::autotune))
+						.then(FargroundClient.<S>literal("cancel").executes(c -> onServer(c, r, FargroundCommands::autotuneCancel))))
+				.then(FargroundClient.<S>literal("prune")
+						.executes(c -> onServer(c, r, g -> FargroundCommands.prune()))
+						.then(FargroundClient.<S>literal("cancel").executes(c -> onServer(c, r, g -> FargroundCommands.pruneCancel()))))
+				.then(FargroundClient.<S>literal("hud")
+						.then(FargroundClient.<S>literal("off").executes(c -> hud(c, r, FargroundConfig.HudMode.OFF)))
+						.then(FargroundClient.<S>literal("generating").executes(c -> hud(c, r, FargroundConfig.HudMode.WHILE_GENERATING)))
+						.then(FargroundClient.<S>literal("always").executes(c -> hud(c, r, FargroundConfig.HudMode.ALWAYS))))
+				.then(FargroundClient.<S>literal("area")
+						.then(FargroundClient.<S>literal("cancel").executes(c -> onServer(c, r, FargroundCommands::cancelAreas)))
+						.then(FargroundClient.<S>argument("x", IntegerArgumentType.integer()).then(FargroundClient.<S>argument("z", IntegerArgumentType.integer())
+								.then(FargroundClient.<S>argument("radius", IntegerArgumentType.integer(1, 2048)).executes(c -> {
+									int x = IntegerArgumentType.getInteger(c, "x");
+									int z = IntegerArgumentType.getInteger(c, "z");
+									int rad = IntegerArgumentType.getInteger(c, "radius");
+									return onServer(c, r, g -> {
+										ServerLevel level = currentLevel();
+										return level == null ? Tr.tr("farground.no_world") : FargroundCommands.area(g, level, x, z, rad);
+									});
+								})))))
+				.then(FargroundClient.<S>literal("reset").executes(c -> onServer(c, r, g -> {
+					ServerLevel level = currentLevel();
+					if (level != null) g.reset(level);
+					return Tr.tr("farground.cmd.reset");
+				})));
 	}
 
 	/**
@@ -112,7 +122,7 @@ public final class FargroundClient implements ClientModInitializer {
 	 */
 	static int autoDetail(int voxelSize) {
 		// Only Voxy's detail rule is known; with Distant Horizons alone the fixed default is used.
-		if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("voxy")) return -1;
+		if (!Platform.isModLoaded("voxy")) return -1;
 		try {
 			Minecraft mc = Minecraft.getInstance();
 			float subDiv = voxySubDivisionSize();
@@ -131,9 +141,8 @@ public final class FargroundClient implements ClientModInitializer {
 	 * (sectionRenderDistance), Distant Horizons in chunks. The larger one if both are installed.
 	 */
 	static int lodRenderDistance() {
-		var loader = net.fabricmc.loader.api.FabricLoader.getInstance();
 		int best = -1;
-		if (loader.isModLoaded("voxy")) {
+		if (Platform.isModLoaded("voxy")) {
 			try {
 				Class<?> c = Class.forName("me.cortex.voxy.client.config.VoxyConfig");
 				Object cfg = c.getField("CONFIG").get(null);
@@ -142,7 +151,7 @@ public final class FargroundClient implements ClientModInitializer {
 			} catch (Throwable ignored) {
 			}
 		}
-		if (loader.isModLoaded("distanthorizons")) best = Math.max(best, DhBridge.renderDistanceChunks());
+		if (Platform.isModLoaded("distanthorizons")) best = Math.max(best, DhBridge.renderDistanceChunks());
 		return best;
 	}
 
@@ -170,19 +179,19 @@ public final class FargroundClient implements ClientModInitializer {
 		return server.getLevel(mc.player.level().dimension());
 	}
 
-	private static int hud(CommandContext<FabricClientCommandSource> c, FargroundConfig.HudMode mode) {
+	private static <S> int hud(CommandContext<S> c, Replies<S> r, FargroundConfig.HudMode mode) {
 		Farground.config().hud = mode;
 		Farground.config().save();
-		c.getSource().sendFeedback(Tr.msg("farground.cmd.hud", Tr.tr("farground.hud_mode." + mode.name().toLowerCase())));
+		r.feedback().accept(c.getSource(), Tr.msg("farground.cmd.hud", Tr.tr("farground.hud_mode." + mode.name().toLowerCase())));
 		return 1;
 	}
 
 	/** Runs an action on the integrated server thread and reports its message in chat. */
-	private static int onServer(CommandContext<FabricClientCommandSource> c, Function<Generator, Component> action) {
+	private static <S> int onServer(CommandContext<S> c, Replies<S> r, Function<Generator, Component> action) {
 		var server = Minecraft.getInstance().getSingleplayerServer();
 		Generator g = Farground.generator();
 		if (server == null || g == null) {
-			c.getSource().sendError(notRunningReason(server));
+			r.error().accept(c.getSource(), notRunningReason(server));
 			return 0;
 		}
 		server.execute(() -> {
@@ -195,17 +204,17 @@ public final class FargroundClient implements ClientModInitializer {
 		return 1;
 	}
 
-	private static int status(CommandContext<FabricClientCommandSource> c) {
+	private static <S> int status(CommandContext<S> c, Replies<S> r) {
 		var mc = Minecraft.getInstance();
 		var server = mc.getSingleplayerServer();
 		Generator g = Farground.generator();
 		if (server == null || g == null || mc.player == null) {
-			c.getSource().sendError(notRunningReason(server));
+			r.error().accept(c.getSource(), notRunningReason(server));
 			return 0;
 		}
 		ServerLevel level = server.getLevel(mc.player.level().dimension());
 		for (Component line : FargroundCommands.status(g, level, mc.player.getUUID())) {
-			c.getSource().sendFeedback(line);
+			r.feedback().accept(c.getSource(), line);
 		}
 		return 1;
 	}
