@@ -195,6 +195,7 @@ public final class Generator {
 			stepAutotune();
 			if (useDh) DhBridge.pauseOwnGenerator(cfg.enabled && cfg.replaceDhGenerator);
 		}
+		if (ticks % (60 * SECOND) == 0) forgetOfflinePlayers();
 		if (ticks % (5 * SECOND) == 0) {
 			recentRate = (generated - generatedAtLastSample) / 5.0;
 			generatedAtLastSample = generated;
@@ -205,6 +206,18 @@ public final class Generator {
 		lastLimit = cap();
 		releaseHeld(false);
 		fill();
+	}
+
+	/** Drops per-player state for players who left, so a server with many visitors doesn't keep growing. */
+	private void forgetOfflinePlayers() {
+		Set<UUID> online = new HashSet<>();
+		for (ServerPlayer p : server.getPlayerList().getPlayers()) online.add(p.getUUID());
+		lastPose.keySet().retainAll(online);
+		velocity.keySet().retainAll(online);
+		spirals.keySet().retainAll(online);
+		spiralDims.keySet().retainAll(online);
+		nearbyCache.keySet().retainAll(online);
+		generatedAtSpiralStart.keySet().retainAll(online);
 	}
 
 	/** Cut by a quarter when the server falls behind; grow by a quarter with plenty of headroom. */
@@ -719,7 +732,20 @@ public final class Generator {
 		// Our own ticket keeps the chunk loading until we are done with it.
 		chunks.addTicket(new Ticket(TICKET, ticketLevel), pos);
 		// getChunkFutureMainThread schedules the work and returns without blocking the server.
-		chunks.getChunkFutureMainThread(cx, cz, target, true).whenComplete((result, error) -> {
+		java.util.concurrent.CompletableFuture<ChunkResult<ChunkAccess>> future;
+		try {
+			future = chunks.getChunkFutureMainThread(cx, cz, target, true);
+		} catch (RuntimeException e) {
+			// Couldn't even ask (another mod's generator threw right away): undo, so this
+			// request doesn't count as "in progress" forever and slowly block all generation.
+			state.pending.remove(key);
+			inFlight--;
+			failed++;
+			chunks.removeTicketWithRadius(TICKET, pos, FULL_LEVEL - ticketLevel);
+			Farground.LOG.warn("Could not request chunk {} {}", cx, cz, e);
+			return;
+		}
+		future.whenComplete((result, error) -> {
 			Runnable done = () -> {
 				try {
 					finish(level, state, cx, cz, key, full, result, error);

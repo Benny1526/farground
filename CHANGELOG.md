@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.9.0 - first full release (no longer beta)
+Release checks before leaving beta: crash safety, low memory, unusual worlds, long sessions.
+- **Settings can't be lost in a crash:** the settings file is now written to a temporary file
+  and swapped in, so a crash or power cut mid-save can't leave it empty (Farground would
+  quietly have gone back to its defaults). Two saves at once (settings screen and auto-tune)
+  can no longer mix.
+- **Progress saves on all drives:** on drives that can't swap files in one step (some network
+  shares and sync folders) the progress file could fail to save every time. It now falls back
+  to a normal replace.
+- **Linux desktops never pause "on battery":** a wireless mouse, keyboard or controller whose
+  battery doesn't report itself as a device could make a Linux desktop look like a laptop on
+  battery. Without a charger listed, a computer now always counts as plugged in.
+- **Long-running servers:** per-player data is cleared when players leave, so a server with
+  many visitors over weeks doesn't keep growing.
+- **More robust requests:** if another mod's generator fails the moment a chunk is requested,
+  that request no longer counts as "in progress" forever (which would slowly have slowed
+  generation to a stop).
+- Tested: the game force-killed mid-generation (3 times, 205,000 chunks on disk, all readable,
+  progress kept, no gaps in the distance); 3 GB of memory (146,000 chunks, no problems);
+  a 47-minute non-stop session (694,000 chunks, memory levels off, no warnings);
+  Amplified, Superflat, single-biome and large-biome worlds; Overworld, Nether and End; a small
+  world border; reopening worlds; old, damaged and empty settings files.
+
 ## 1.8.0
 - **NeoForge support** (26.2 and 26.3) with Distant Horizons. Same features, settings and
   commands as on Fabric; the settings screen needs Cloth Config. Tested on NeoForge 26.3.0.99

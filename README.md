@@ -12,7 +12,7 @@ hosting a LAN world, and on dedicated servers.
 **Fabric**
 | | 26.2 | 26.3 |
 |---|---|---|
-| Jar | `farground-1.8.0+26.2.jar` | `farground-1.8.0+26.3.jar` |
+| Jar | `farground-1.9.0+26.2.jar` | `farground-1.9.0+26.3.jar` |
 | Fabric Loader | 0.18+ | 0.18+ |
 | LOD mod (one or both) | Voxy 0.2.19-beta, or Distant Horizons 3.3.3 | Voxy 0.2.20-beta, or Distant Horizons 3.3.4 (tested) |
 | Optional | Mod Menu + Cloth Config (settings screen) | same |
@@ -21,7 +21,7 @@ hosting a LAN world, and on dedicated servers.
 **NeoForge**
 | | 26.2 | 26.3 |
 |---|---|---|
-| Jar | `farground-neoforge-1.8.0+26.2.jar` | `farground-neoforge-1.8.0+26.3.jar` |
+| Jar | `farground-neoforge-1.9.0+26.2.jar` | `farground-neoforge-1.9.0+26.3.jar` |
 | NeoForge | 26.2.0.93+ | 26.3.0.99+ (tested) |
 | LOD mod | Distant Horizons 3.3.3 | Distant Horizons 3.3.4 (tested) |
 | Optional | Cloth Config (settings screen, under Mods → Farground → Config) | same |

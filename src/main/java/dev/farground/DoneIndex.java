@@ -175,7 +175,12 @@ public final class DoneIndex {
 				writeMap(out, full);
 				writeMap(out, terrain);
 			}
-			Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+			try {
+				Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+			} catch (java.nio.file.AtomicMoveNotSupportedException e) {
+				// Some drives (network shares, some sync folders) can't swap files in one step.
+				Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+			}
 			dirty = false;
 		} catch (IOException e) {
 			Farground.LOG.warn("Could not save progress file {}", file, e);

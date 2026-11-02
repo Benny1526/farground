@@ -7,7 +7,9 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 /** Settings stored in config/farground.json. Every field can also be changed in the Mod Menu screen. */
 public final class FargroundConfig {
@@ -153,11 +155,23 @@ public final class FargroundConfig {
 		if (hudCorner == null) hudCorner = HudCorner.TOP_LEFT;
 	}
 
-	public void save() {
+	/**
+	 * Writes to a temporary file first and then swaps it in, so a crash mid-save can never leave
+	 * an empty or half-written settings file. Synchronized because the settings screen (client
+	 * thread) and auto-tune (server thread) can both save.
+	 */
+	public synchronized void save() {
 		try {
-			Files.createDirectories(file().getParent());
-			try (Writer w = Files.newBufferedWriter(file())) {
+			Path target = file();
+			Files.createDirectories(target.getParent());
+			Path tmp = target.resolveSibling(target.getFileName() + ".tmp");
+			try (Writer w = Files.newBufferedWriter(tmp)) {
 				GSON.toJson(this, w);
+			}
+			try {
+				Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+			} catch (AtomicMoveNotSupportedException e) {
+				Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
 			}
 		} catch (IOException e) {
 			Farground.LOG.warn("Could not save {}", file(), e);

@@ -105,23 +105,26 @@ public final class Battery {
 	/**
 	 * Linux: on battery only when a system battery is discharging and no mains or USB power
 	 * supply is online. Wireless mice, keyboards and headsets (scope "Device") are ignored.
+	 * A computer without any charger entry is a desktop (some device batteries don't report a
+	 * scope), so it never counts as on battery.
 	 */
 	static boolean linuxOnBattery(Path root) {
-		boolean discharging = false;
+		boolean discharging = false, hasCharger = false;
 		try (var dirs = Files.list(root)) {
 			for (Path d : (Iterable<Path>) dirs::iterator) {
 				String type = read(d.resolve("type"));
 				if (type.equalsIgnoreCase("Battery")) {
 					if (read(d.resolve("scope")).equalsIgnoreCase("Device")) continue;
 					if (read(d.resolve("status")).equalsIgnoreCase("Discharging")) discharging = true;
-				} else if (read(d.resolve("online")).equals("1")) {
-					return false; // mains, USB-C or other charger plugged in
+				} else if (!type.isEmpty()) {
+					hasCharger = true; // Mains, USB, USB_C ...: a laptop's charger input
+					if (read(d.resolve("online")).equals("1")) return false; // plugged in
 				}
 			}
 		} catch (Exception e) {
 			return false;
 		}
-		return discharging;
+		return discharging && hasCharger;
 	}
 
 	private static String read(Path p) {
