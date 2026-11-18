@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.10.0 - time-left estimate, fixed dark distant terrain
+- **Fixed: distant terrain drawn black with Voxy** ([#1](https://github.com/Benny1526/farground/issues/1)).
+  Snow-covered land was the worst: snow layers, paths and other thin blocks counted as solid
+  ground in the fast lighting, so their tops got no sky light, and slopes under overhangs went
+  dark too. Fast lighting now follows Minecraft's own sky light rules inside each chunk: full
+  light down through air, a little lost in leaves, water and snow, none in solid blocks, then
+  spreading sideways under overhangs. Tested in-game against Minecraft's real lighting on the
+  same snowy area: the views now look the same, with an average difference of 0.1 of 15 light
+  levels and about 0.2 ms of work per chunk. Land generated before this update keeps its dark
+  look; `/farground reset` makes Farground go over it again and send Voxy the new light.
+- **How long it will take:** the progress line on screen now says roughly how long is left
+  around you, for example "Farground 42% · 310/s · ~1h 20m left". `/farground status` shows it
+  too, along with the average speed it's based on.
+- The estimate uses the average speed over the last few minutes, so a short burst or pause
+  doesn't swing it around. It appears about 30 seconds after generation starts and is hidden
+  while Farground is paused (on battery, low memory, or by you).
+- Tested in-game: the estimate appears after 30 seconds and settles as the speed settles.
+
 ## 1.9.0 - first full release (no longer beta)
 Release checks before leaving beta: crash safety, low memory, unusual worlds, long sessions.
 - **Settings can't be lost in a crash:** the settings file is now written to a temporary file

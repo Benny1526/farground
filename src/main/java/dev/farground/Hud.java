@@ -4,7 +4,7 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
-/** A small "Farground 42% · 95/s" line in a corner of the screen. */
+/** A small "Farground 42% · 95/s · ~1h 20m left" line in a corner of the screen. */
 public final class Hud {
 	private static final int MARGIN = 4;
 	private static final int PAD = 3;
@@ -32,7 +32,9 @@ public final class Hud {
 			String extra = tune != null && tune.key().equals("farground.tune.trying") ? Tr.str("farground.hud.tuning")
 					: gen.playersMoving ? Tr.str("farground.hud.slowed")
 					: gen.afk && cfg.afkTurbo ? Tr.str("farground.hud.turbo") : "";
-			text = Tr.str("farground.hud.progress", (int) Math.floor(gen.progress * 100), Tr.n(gen.recentRate), extra);
+			long left = gen.secondsLeft();
+			String eta = left < 0 ? "" : Tr.str("farground.hud.eta", Tr.duration(left));
+			text = Tr.str("farground.hud.progress", (int) Math.floor(gen.progress * 100), Tr.n(gen.recentRate), eta + extra);
 		}
 
 		var font = mc.font;

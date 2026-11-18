@@ -94,6 +94,9 @@ public final class Generator {
 	volatile boolean onBattery;
 	volatile double progress;       // 0..1 of the area around the (first) player
 	volatile double recentRate;     // chunks per second over the last few seconds
+	volatile double averageRate;    // chunks per second over the last few minutes, for the time-left estimate
+	volatile long remaining = -1;   // chunks still to generate around the (first) player, -1 = unknown
+	private int rateSamples;
 	volatile Tr.Msg areaStatus;     // non-null while an /farground area job runs
 	volatile boolean afk;           // window unfocused, or not moving for afkSeconds
 	volatile boolean memoryTight;   // Java memory above memoryPausePercent
@@ -199,6 +202,7 @@ public final class Generator {
 		if (ticks % (5 * SECOND) == 0) {
 			recentRate = (generated - generatedAtLastSample) / 5.0;
 			generatedAtLastSample = generated;
+			updateAverageRate();
 			updateProgress();
 		}
 		trackMovement();
@@ -804,6 +808,27 @@ public final class Generator {
 	// Progress, commands, lifecycle
 	// =====================================================================================
 
+	/**
+	 * Averages the speed over the last few minutes (a plain average for the first 3 minutes, then a
+	 * moving one), counting time spent slowed while you move but not time spent paused. The
+	 * time-left estimate uses this, so it doesn't jump with every short slowdown or turbo burst.
+	 */
+	private void updateAverageRate() {
+		boolean counting = !paused && !onBattery && !memoryTight && areaStatus == null && !waitingReason.startsWith("done");
+		if (!counting) return;
+		double weight = Math.max(1.0 / (rateSamples + 1), 5.0 / 180.0);
+		averageRate = rateSamples == 0 ? recentRate : averageRate + (recentRate - averageRate) * weight;
+		rateSamples++;
+	}
+
+	/** Seconds until the area around the first player is done at the recent average speed, or -1 if unknown. */
+	public long secondsLeft() {
+		long left = remaining;
+		double rate = averageRate;
+		if (left <= 0 || rateSamples < 6 || rate < 0.5) return -1; // needs 30 s of samples first
+		return (long) Math.ceil(left / rate);
+	}
+
 	/** Share of the ring around the first player that is done (both qualities count). */
 	private void updateProgress() {
 		List<ServerPlayer> players = server.getPlayerList().getPlayers();
@@ -817,6 +842,7 @@ public final class Generator {
 		long innerDone = done.countInSquare(s.centerX - inner + 1, s.centerZ - inner + 1, s.centerX + inner - 1, s.centerZ + inner - 1);
 		long total = (long) (2 * r + 1) * (2 * r + 1) - (long) (2 * inner - 1) * (2 * inner - 1);
 		progress = total <= 0 ? 1 : Math.min(1.0, (outer - innerDone) / (double) total);
+		remaining = total <= 0 ? 0 : Math.max(0, total - (outer - innerDone));
 	}
 
 	/** Queues an area job in the given dimension. */

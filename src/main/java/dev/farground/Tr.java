@@ -79,6 +79,16 @@ public final class Tr {
 		return String.format(Locale.ROOT, "%.0f", v);
 	}
 
+	/** A rough duration like "1h 20m", in the player's language. */
+	public static MutableComponent duration(long seconds) {
+		if (seconds < 60) return tr("farground.time.under_minute");
+		long m = Math.round(seconds / 60.0);
+		if (m < 60) return tr("farground.time.minutes", m);
+		long h = m / 60;
+		if (h < 48) return tr("farground.time.hours", h, m % 60);
+		return tr("farground.time.days", h / 24, h % 24);
+	}
+
 	/** One decimal, like "12.5". */
 	public static String n1(double v) {
 		return String.format(Locale.ROOT, "%.1f", v);

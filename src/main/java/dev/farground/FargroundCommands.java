@@ -35,6 +35,8 @@ public final class FargroundCommands {
 				g.radiusIsAuto ? tr("farground.status.radius_auto", g.lodName()) : "",
 				player == null ? 0 : g.currentRadius(player), level == null ? 0 : g.doneCount(level))));
 		out.add(indent(tr("farground.status.session", g.generated, g.generatedFull, g.failed, n(g.recentRate))));
+		long left = g.secondsLeft();
+		if (left >= 0) out.add(indent(tr("farground.status.eta", Tr.duration(left), n(g.averageRate))));
 		out.add(indent(tr("farground.status.limits", g.lastInFlight, g.lastLimit, cfg.maxConcurrent, cfg.activeConcurrent, n1(g.lastMspt))));
 		Object auto = cfg.fullDetailRadius >= 0 ? ""
 				: Platform.isModLoaded("voxy") ? tr("farground.status.auto_voxy")
