@@ -25,16 +25,20 @@ import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.storage.LevelResource;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.LongPredicate;
 
 /**
  * Generates chunks around each player, nearest first, and hands them to Voxy.
@@ -104,11 +108,16 @@ public final class Generator {
 	volatile Tr.Msg tuneStatus;     // non-null while auto-tune runs
 	volatile int radiusNow;         // radius in use (after "match my LOD mod")
 	volatile boolean radiusIsAuto;  // radiusNow came from the LOD mod's render distance
+	private volatile boolean settled; // everything in range got done, and little has come up since
 
 	private static final class DimState {
 		final DoneIndex done;
 		final LongOpenHashSet pending = new LongOpenHashSet();
-		DimState(Path file) { this.done = new DoneIndex(file); }
+		final StaleChunks stale;
+		DimState(Path file) {
+			this.done = new DoneIndex(file);
+			this.stale = new StaleChunks(file.resolveSibling(file.getFileName() + ".stale"));
+		}
 	}
 
 	/** A one-off /farground area job: fill a square around a point at full detail. */
@@ -116,6 +125,8 @@ public final class Generator {
 		final ResourceKey<Level> dim;
 		final Spiral spiral;
 		final int x, z, radius;
+		/** This job's chunks that may still be in progress; pruned as they finish. */
+		final LongOpenHashSet requested = new LongOpenHashSet();
 		AreaJob(ResourceKey<Level> dim, int x, int z, int radius) {
 			this.dim = dim;
 			this.x = x; this.z = z; this.radius = radius;
@@ -142,6 +153,32 @@ public final class Generator {
 		this.useVoxy = !serverMode && Platform.isModLoaded("voxy");
 		this.useDh = Platform.isModLoaded("distanthorizons");
 		refreshRadius();
+		checkC2me();
+	}
+
+	/**
+	 * With C2ME, chunks are built on its thread pool, so the right number at once depends on its
+	 * thread count. If that count changed since the auto-tune (or the tune ran before Farground
+	 * recorded it), start from a scaled guess and tune again the next time you are away.
+	 */
+	private void checkC2me() {
+		C2meBridge.Threads t = C2meBridge.threads();
+		if (t == null) return;
+		if (t.belowDefault()) {
+			Farground.LOG.warn("C2ME is set to {} world-gen threads, below its default of {} for this PC. Farground can't generate"
+					+ " faster than those threads allow; set globalExecutorParallelism = \"default\" in config/c2me.toml.", t.threads(), t.defaultThreads());
+		}
+		if (serverMode) return; // the auto-tune only runs in singleplayer
+		int old = cfg.tunedForC2meThreads;
+		if (!cfg.autoTuned || old == t.threads()) return;
+		int guess = old > 0 ? (int) Math.round(cfg.maxConcurrent * (double) t.threads() / old)
+				: Math.max(cfg.maxConcurrent, t.threads() * 2);
+		guess = Math.clamp(guess, 8, 256);
+		Farground.LOG.info("C2ME now has {} world-gen threads ({} when the speed was tuned): starting at {} at once"
+				+ " instead of {}, and tuning again the next time you are away", t.threads(), old > 0 ? old : "unknown", guess, cfg.maxConcurrent);
+		setMaxConcurrent(guess);
+		cfg.autoTuned = false;
+		cfg.save();
 	}
 
 	/** True if at least one LOD mod is installed to receive what Farground generates. */
@@ -209,6 +246,7 @@ public final class Generator {
 		lastInFlight = inFlight;
 		lastLimit = cap();
 		releaseHeld(false);
+		clearStaleChunks();
 		fill();
 	}
 
@@ -409,13 +447,15 @@ public final class Generator {
 	// Auto-tune: try a few speeds for 10 s each while you are away, keep the best one
 	// =====================================================================================
 
-	private static final int[] TUNE_LEVELS = {16, 24, 32, 48, 64, 96, 128};
+	private static final int[] DEFAULT_TUNE_LEVELS = {16, 24, 32, 48, 64, 96, 128};
 	private static final int TUNE_WARMUP = 4, TUNE_MEASURE = 10; // seconds
 	private boolean tuneRequested;
 	private int tuneIndex = -1, tuneSeconds, tuneLevel;
 	private long tuneStartCount;
-	private final double[] tuneRate = new double[TUNE_LEVELS.length];
-	private final double[] tuneMspt = new double[TUNE_LEVELS.length];
+	/** Speeds to try: multiples of C2ME's thread count when it is installed, else a fixed list. */
+	private int[] tuneLevels = DEFAULT_TUNE_LEVELS;
+	private double[] tuneRate = new double[tuneLevels.length];
+	private double[] tuneMspt = new double[tuneLevels.length];
 
 	private boolean tuneManual, tuneAnnounced;
 
@@ -434,11 +474,27 @@ public final class Generator {
 		tuneLevel = 0;
 		tuneStatus = null;
 		cfg.autoTuned = true;
+		// Cancelled on purpose: don't start it again just because the biome speed-up is in use.
+		if (FastBiomes.used) cfg.tunedWithFastBiomes = true;
+		cfg.save();
+	}
+
+	/**
+	 * The faster modded-biome climate makes chunks much cheaper (about 3x with Lithosphere), so a
+	 * speed tuned without it is too low. The first time it is used in a tuned world, tune again
+	 * the next time you are away. Checked every tick because it only shows once chunks generate.
+	 */
+	private void checkFastBiomes() {
+		if (!FastBiomes.used || !cfg.autoTuned || cfg.tunedWithFastBiomes) return;
+		Farground.LOG.info("Chunks build faster now (biomes are worked out in one batch for this world's modded biome source):"
+				+ " tuning the speed again the next time you are away");
+		cfg.autoTuned = false;
 		cfg.save();
 	}
 
 	private void stepAutotune() {
 		if (serverMode) return;
+		checkFastBiomes();
 		if (!tuneRequested && cfg.autoTuneOnFirstAfk && !cfg.autoTuned && afk) tuneRequested = true;
 		boolean working = waitingReason.startsWith("generating") || tuneIndex >= 0;
 		if (tuneIndex < 0) {
@@ -447,7 +503,10 @@ public final class Generator {
 			if (tuneRequested && ready && working && !paused && !onBattery) {
 				tuneIndex = 0;
 				tuneSeconds = 0;
-				Arrays.fill(tuneRate, 0);
+				int[] c2me = C2meBridge.tuneLevels();
+				tuneLevels = c2me != null ? c2me : DEFAULT_TUNE_LEVELS;
+				tuneRate = new double[tuneLevels.length];
+				tuneMspt = new double[tuneLevels.length];
 				// Only the command version says so in chat; the automatic one shows "tuning" in the corner.
 				if (tuneManual && !tuneAnnounced) {
 					tuneAnnounced = true;
@@ -467,8 +526,8 @@ public final class Generator {
 			tuneStatus = new Tr.Msg("farground.tune.paused");
 			return;
 		}
-		tuneLevel = TUNE_LEVELS[tuneIndex];
-		tuneStatus = new Tr.Msg("farground.tune.trying", tuneLevel, tuneIndex + 1, TUNE_LEVELS.length);
+		tuneLevel = tuneLevels[tuneIndex];
+		tuneStatus = new Tr.Msg("farground.tune.trying", tuneLevel, tuneIndex + 1, tuneLevels.length);
 		tuneSeconds++;
 		if (tuneSeconds == TUNE_WARMUP) tuneStartCount = generated;
 		if (tuneSeconds >= TUNE_WARMUP + TUNE_MEASURE) {
@@ -476,25 +535,28 @@ public final class Generator {
 			tuneMspt[tuneIndex] = lastMspt;
 			tuneIndex++;
 			tuneSeconds = 0;
-			if (tuneIndex >= TUNE_LEVELS.length) finishAutotune();
+			if (tuneIndex >= tuneLevels.length) finishAutotune();
 		}
 	}
 
 	private void finishAutotune() {
 		double best = 0;
-		for (int i = 0; i < TUNE_LEVELS.length; i++) {
+		for (int i = 0; i < tuneLevels.length; i++) {
 			if (tuneMspt[i] <= cfg.tickBudgetMs) best = Math.max(best, tuneRate[i]);
 		}
 		int pick = cfg.maxConcurrent;
-		for (int i = 0; i < TUNE_LEVELS.length; i++) {
+		for (int i = 0; i < tuneLevels.length; i++) {
 			// Smallest setting within 8% of the best: same speed, less load on your PC.
-			if (tuneMspt[i] <= cfg.tickBudgetMs && tuneRate[i] >= best * 0.92) { pick = TUNE_LEVELS[i]; break; }
+			if (tuneMspt[i] <= cfg.tickBudgetMs && tuneRate[i] >= best * 0.92) { pick = tuneLevels[i]; break; }
 		}
 		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < TUNE_LEVELS.length; i++) sb.append(TUNE_LEVELS[i]).append('=').append(Math.round(tuneRate[i])).append("/s ");
+		for (int i = 0; i < tuneLevels.length; i++) sb.append(tuneLevels[i]).append('=').append(Math.round(tuneRate[i])).append("/s ");
 		Farground.LOG.info("Auto-tune results: {}-> picked {}", sb, pick);
 		setMaxConcurrent(pick);
 		cfg.autoTuned = true;
+		C2meBridge.Threads c2me = C2meBridge.threads();
+		cfg.tunedForC2meThreads = c2me == null ? 0 : c2me.threads();
+		cfg.tunedWithFastBiomes = FastBiomes.used;
 		cfg.save();
 		tuneRequested = false;
 		tuneManual = false;
@@ -551,9 +613,15 @@ public final class Generator {
 			if (level == null) { areas.pollFirst(); continue; }
 			if (useDh && DhBridge.busy(level)) { waitingReason = "letting Distant Horizons catch up"; return; }
 			DimState state = dim(level);
-			pump(level, state, job.spiral, cap, true, job.x, job.z);
+			// Drop finished chunks now and then, so a huge area doesn't keep every key it ever asked for.
+			if (job.requested.size() > 4096) job.requested.removeIf((LongPredicate) k -> !state.pending.contains(k));
+			pump(level, state, job.spiral, cap, true, job.x, job.z, job.requested);
 			if (job.spiral.finished()) {
-				if (state.pending.isEmpty()) {
+				// Wait for this job's own chunks only. Waiting for the whole dimension to go idle
+				// never ended: generation around the player starts meanwhile and keeps chunks in
+				// progress, so the job was never reported done and blocked any job queued after it.
+				job.requested.removeIf((LongPredicate) k -> !state.pending.contains(k));
+				if (job.requested.isEmpty()) {
 					areas.pollFirst();
 					broadcast("farground.area.done", job.x * 16, job.z * 16, job.radius);
 				} else {
@@ -596,7 +664,7 @@ public final class Generator {
 				continue;
 			}
 			anyWork = true;
-			pump(level, state, spiral, cap, false, spiral.centerX, spiral.centerZ);
+			pump(level, state, spiral, cap, false, spiral.centerX, spiral.centerZ, null);
 		}
 		if (anyWork || inFlight > 0) waitingReason = busy;
 		else if (lodBusy) waitingReason = "letting Distant Horizons catch up";
@@ -605,11 +673,16 @@ public final class Generator {
 		else {
 			if (!waitingReason.startsWith("done")) progress = 1.0; // don't wait for the next 5 s refresh
 			waitingReason = "done - everything in range is generated";
+			settled = true;
 		}
 	}
 
-	/** Requests chunks from one spiral until the cap or scan budget is reached. */
-	private void pump(ServerLevel level, DimState state, Spiral spiral, int cap, boolean forceFull, int centerX, int centerZ) {
+	/**
+	 * Requests chunks from one spiral until the cap or scan budget is reached. track, if not null,
+	 * collects the chunks this spiral is waiting on (its own requests, and any already in progress).
+	 */
+	private void pump(ServerLevel level, DimState state, Spiral spiral, int cap, boolean forceFull, int centerX, int centerZ,
+	                  LongOpenHashSet track) {
 		var border = level.getWorldBorder();
 		int fullDetail = fullDetailFor(level);
 		int budget = SCAN_BUDGET;
@@ -619,9 +692,14 @@ public final class Generator {
 			boolean full = serverMode || forceFull || d <= fullDetail;
 			if (state.done.isDone(cx, cz, full)) continue;
 			long key = ChunkPos.pack(cx, cz);
-			if (state.pending.contains(key)) continue;
+			if (state.pending.contains(key)) {
+				if (track != null) track.add(key);
+				continue;
+			}
 			if (!border.isWithinBounds(new ChunkPos(cx, cz))) continue;
-			request(level, state, cx, cz, key, full);
+			// Terrain-only chunks well outside the full-detail ring may be left unsaved (see finish).
+			request(level, state, cx, cz, key, full, !full && d > fullDetail + 1);
+			if (track != null && state.pending.contains(key)) track.add(key);
 		}
 	}
 
@@ -721,7 +799,41 @@ public final class Generator {
 		}
 	}
 
-	private void request(ServerLevel level, DimState state, int cx, int cz, long key, boolean full) {
+	/**
+	 * ServerChunkCache.getChunkFutureMainThread: the non-blocking request. The public
+	 * getChunkFuture() blocks the server thread until the chunk is done when called from it;
+	 * this is the private method it wraps, which only schedules the work.
+	 *
+	 * Called through a method handle instead of an access widener. Widening it meant Loom had to
+	 * rewrite the Minecraft jar on every fresh build, which on-access antivirus scanners (seen
+	 * with Bitdefender) block by holding the new jar open. A handle costs about the same as a
+	 * direct call. Minecraft 26.x runs with its real names on both loaders, so the name holds.
+	 */
+	private static final MethodHandle CHUNK_FUTURE;
+	static {
+		try {
+			Method m = ServerChunkCache.class.getDeclaredMethod("getChunkFutureMainThread",
+					int.class, int.class, ChunkStatus.class, boolean.class);
+			m.setAccessible(true);
+			CHUNK_FUTURE = MethodHandles.lookup().unreflect(m);
+		} catch (ReflectiveOperationException | RuntimeException e) {
+			throw new IllegalStateException("Farground needs ServerChunkCache.getChunkFutureMainThread(int, int, ChunkStatus, boolean),"
+					+ " which this Minecraft version doesn't have. Farground needs an update for it.", e);
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private static CompletableFuture<ChunkResult<ChunkAccess>> chunkFuture(ServerChunkCache chunks, int cx, int cz, ChunkStatus target) {
+		try {
+			return (CompletableFuture<ChunkResult<ChunkAccess>>) CHUNK_FUTURE.invokeExact(chunks, cx, cz, target, true);
+		} catch (RuntimeException | Error e) {
+			throw e;
+		} catch (Throwable t) {
+			throw new RuntimeException(t); // it declares no checked exceptions
+		}
+	}
+
+	private void request(ServerLevel level, DimState state, int cx, int cz, long key, boolean full, boolean farTerrain) {
 		state.pending.add(key);
 		inFlight++;
 		if (firstRequestNanos == 0) firstRequestNanos = System.nanoTime();
@@ -735,10 +847,10 @@ public final class Generator {
 		var chunks = level.getChunkSource();
 		// Our own ticket keeps the chunk loading until we are done with it.
 		chunks.addTicket(new Ticket(TICKET, ticketLevel), pos);
-		// getChunkFutureMainThread schedules the work and returns without blocking the server.
-		java.util.concurrent.CompletableFuture<ChunkResult<ChunkAccess>> future;
+		// Schedules the work and returns without blocking the server (see CHUNK_FUTURE).
+		CompletableFuture<ChunkResult<ChunkAccess>> future;
 		try {
-			future = chunks.getChunkFutureMainThread(cx, cz, target, true);
+			future = chunkFuture(chunks, cx, cz, target);
 		} catch (RuntimeException e) {
 			// Couldn't even ask (another mod's generator threw right away): undo, so this
 			// request doesn't count as "in progress" forever and slowly block all generation.
@@ -752,7 +864,7 @@ public final class Generator {
 		future.whenComplete((result, error) -> {
 			Runnable done = () -> {
 				try {
-					finish(level, state, cx, cz, key, full, result, error);
+					finish(level, state, cx, cz, key, full, farTerrain, result, error);
 				} finally {
 					if (cfg.holdTicks > 0) {
 						held.add(new Held(ticks + cfg.holdTicks, chunks, pos, FULL_LEVEL - ticketLevel));
@@ -766,7 +878,7 @@ public final class Generator {
 		});
 	}
 
-	private void finish(ServerLevel level, DimState state, int cx, int cz, long key, boolean full,
+	private void finish(ServerLevel level, DimState state, int cx, int cz, long key, boolean full, boolean farTerrain,
 	                    ChunkResult<ChunkAccess> result, Throwable error) {
 		state.pending.remove(key);
 		inFlight--;
@@ -789,10 +901,10 @@ public final class Generator {
 			generated++;
 			if (full) generatedFull++;
 			lastDoneNanos = System.nanoTime();
-			// Experimental: don't write never-visited chunks to disk. Only touches chunks that are
-			// still being generated (never a finished chunk you have been near).
-			if (!cfg.saveUnvisitedChunks && !(chunk instanceof LevelChunk)) {
+			// Don't write far terrain-only chunks to disk (see skipSaving).
+			if (farTerrain && !cfg.saveFarTerrain && skipSaving(level, state, chunk, cx, cz)) {
 				chunk.tryMarkSaved();
+				state.stale.add(cx, cz); // an early copy of it may already be on disk
 			}
 			if (generated % 2000 == 0) {
 				Farground.LOG.info("Sent {} chunks to " + lodName() + " this session ({} full detail, {} generating, limit {}, tick {} ms)",
@@ -802,6 +914,123 @@ public final class Generator {
 			failed++;
 		}
 		fill();
+	}
+
+	/**
+	 * Whether a finished far chunk can be left unsaved. Safe only for chunks that have just the
+	 * land shape: Minecraft's terrain step writes into its own chunk only, so a skipped chunk is
+	 * re-created exactly the same if anyone goes there. Trees and other decorations spill into
+	 * the neighbouring chunks, so a chunk is always saved when it, or any chunk next to it, has
+	 * been decorated (otherwise the parts of a neighbour's trees inside it would be lost). If a
+	 * neighbour gets decorated later, its trees mark this chunk as changed again, and Minecraft
+	 * saves it after all.
+	 */
+	private static boolean skipSaving(ServerLevel level, DimState state, ChunkAccess chunk, int cx, int cz) {
+		if (chunk instanceof LevelChunk || chunk.getPersistedStatus().isOrAfter(ChunkStatus.FEATURES)) return false;
+		var chunkMap = level.getChunkSource().chunkMap;
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				if (dx == 0 && dz == 0) continue;
+				int nx = cx + dx, nz = cz + dz;
+				if (state.done.isDone(nx, nz, true)) return false;
+				var holder = chunkMap.getUpdatingChunkIfPresent(ChunkPos.pack(nx, nz));
+				if (holder == null) continue;
+				ChunkStatus s = holder.getLatestStatus();
+				if (s != null && s.isOrAfter(ChunkStatus.FEATURES)) return false;
+			}
+		}
+		return true;
+	}
+
+	// ---- Removing out-of-date early copies of far chunks from disk (see StaleChunks) ----
+
+	private static final int STALE_CHECKS_PER_TICK = 128, STALE_MAX_READING = 512;
+	/** A structure can reach 8 chunks, and its decoration 1 more. */
+	private static final int STRUCTURE_REACH = 9;
+	/** How far the spiral must be past a chunk: its 8-chunk tile, the one before, and the 8-chunk reach. */
+	private static final int SPIRAL_PAST = 24;
+
+	private enum StaleAction { WAIT, KEEP, CHECK }
+
+	private void clearStaleChunks() {
+		if (cfg.saveFarTerrain) return;
+		for (var e : dims.entrySet()) {
+			StaleChunks q = e.getValue().stale;
+			if (q.isEmpty()) continue;
+			ServerLevel level = server.getLevel(e.getKey());
+			if (level == null) continue;
+			for (int n = 0; n < STALE_CHECKS_PER_TICK && !q.isEmpty() && q.reading < STALE_MAX_READING; n++) {
+				long key = q.peek();
+				int cx = StaleChunks.x(key), cz = StaleChunks.z(key);
+				StaleAction action = staleAction(level, cx, cz);
+				if (action == StaleAction.WAIT) break;
+				q.pop();
+				if (action == StaleAction.CHECK) removeIfEarlyCopy(level, e.getValue(), cx, cz);
+			}
+		}
+	}
+
+	/** Waits until every spiral here is well past the chunk; keeps chunks close to a player. */
+	private StaleAction staleAction(ServerLevel level, int cx, int cz) {
+		int keepNear = server.getPlayerList().getViewDistance() + STRUCTURE_REACH + 1;
+		int fullDetail = fullDetailFor(level);
+		boolean anySpiral = false;
+		for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+			if (p.level() != level) continue;
+			ChunkPos at = p.chunkPosition();
+			if (Math.max(Math.abs(cx - at.x()), Math.abs(cz - at.z())) <= keepNear) return StaleAction.KEEP;
+			Spiral s = spirals.get(p.getUUID());
+			if (s == null || spiralDims.get(p.getUUID()) != level.dimension()) continue;
+			anySpiral = true;
+			int d = Math.max(Math.abs(cx - s.centerX), Math.abs(cz - s.centerZ));
+			if (d <= fullDetail + STRUCTURE_REACH) return StaleAction.KEEP;
+			if (!s.finished() && d <= radiusNow + 8 && s.radius() < d + SPIRAL_PAST) return StaleAction.WAIT;
+		}
+		return anySpiral ? StaleAction.CHECK : StaleAction.WAIT;
+	}
+
+	/**
+	 * Deletes a chunk's saved copy only if the copy itself is from before any blocks existed. Such
+	 * a copy can't hold anything from a neighbour, so Minecraft re-creates it exactly.
+	 */
+	private void removeIfEarlyCopy(ServerLevel level, DimState state, int cx, int cz) {
+		ChunkPos pos = new ChunkPos(cx, cz);
+		var chunkMap = level.getChunkSource().chunkMap;
+		state.stale.reading++;
+		chunkMap.read(pos).whenComplete((tag, error) -> server.execute(() -> {
+			state.stale.reading--;
+			if (stopped || error != null || tag.isEmpty()) return;
+			if (!StaleChunks.earlyStage(tag.get().getStringOr("Status", "minecraft:full"))) return;
+			if (!safeToRemove(level, state, cx, cz)) return;
+			chunkMap.write(pos, (net.minecraft.nbt.CompoundTag) null);
+			state.stale.removed++;
+		}));
+	}
+
+	private static boolean safeToRemove(ServerLevel level, DimState state, int cx, int cz) {
+		int r = STRUCTURE_REACH;
+		if (state.done.anyFullInSquare(cx - r, cz - r, cx + r, cz + r)) return false;
+		var chunkMap = level.getChunkSource().chunkMap;
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				var holder = chunkMap.getUpdatingChunkIfPresent(ChunkPos.pack(cx + dx, cz + dz));
+				if (holder == null) continue;
+				ChunkStatus s = holder.getLatestStatus();
+				if (s != null && s.isOrAfter(ChunkStatus.FEATURES)) return false;
+				if (dx == 0 && dz == 0) {
+					ChunkAccess c = holder.getLatestChunk();
+					if (c != null && c.isUnsaved()) return false; // about to be saved anyway
+				}
+			}
+		}
+		return true;
+	}
+
+	/** Dimensions where saved chunks were removed this session, so their files can be shrunk. */
+	public List<ResourceKey<Level>> dimensionsWithRemovedChunks() {
+		List<ResourceKey<Level>> out = new ArrayList<>();
+		for (var e : dims.entrySet()) if (e.getValue().stale.removed > 0) out.add(e.getKey());
+		return out;
 	}
 
 	// =====================================================================================
@@ -843,6 +1072,22 @@ public final class Generator {
 		long total = (long) (2 * r + 1) * (2 * r + 1) - (long) (2 * inner - 1) * (2 * inner - 1);
 		progress = total <= 0 ? 1 : Math.min(1.0, (outer - innerDone) / (double) total);
 		remaining = total <= 0 ? 0 : Math.max(0, total - (outer - innerDone));
+		if (progress < SETTLED_PROGRESS && remaining > SETTLED_REMAINING && !waitingReason.startsWith("done")) settled = false;
+	}
+
+	/** With less than this share done and this many chunks left, new land is a real job again. */
+	private static final double SETTLED_PROGRESS = 0.75;
+	private static final long SETTLED_REMAINING = 20_000;
+
+	/**
+	 * True when the first fill is done and Farground is just adding the strips of land that come
+	 * into range as you move. Not worth a line on screen. Travelling far enough to leave a lot
+	 * to do, starting an area job, pausing or tuning the speed still shows it.
+	 */
+	boolean onlyToppingUp() {
+		var tune = tuneStatus;
+		return settled && !paused && areaStatus == null
+				&& (tune == null || !tune.key().equals("farground.tune.trying"));
 	}
 
 	/** Queues an area job in the given dimension. */
@@ -860,6 +1105,7 @@ public final class Generator {
 	/** Clears progress for one dimension so it gets generated again. */
 	public void reset(ServerLevel level) {
 		dim(level).done.clear();
+		settled = false;
 		restartSpirals();
 	}
 
@@ -887,7 +1133,10 @@ public final class Generator {
 	}
 
 	public void saveAll() {
-		for (DimState s : dims.values()) s.done.saveIfDirty();
+		for (DimState s : dims.values()) {
+			s.done.saveIfDirty();
+			s.stale.saveIfDirty();
+		}
 	}
 
 	/**
@@ -907,6 +1156,13 @@ public final class Generator {
 		}
 		releaseHeld(true);
 		saveAll();
+		for (var e : dims.entrySet()) {
+			StaleChunks q = e.getValue().stale;
+			if (q.removed > 0 || !q.isEmpty()) {
+				Farground.LOG.info("{}: removed {} out-of-date far chunks from disk, {} still waiting",
+						e.getKey().identifier(), q.removed, q.size());
+			}
+		}
 		if (useDh) DhBridge.reset();
 	}
 }

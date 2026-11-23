@@ -12,7 +12,7 @@ hosting a LAN world, and on dedicated servers.
 **Fabric**
 | | 26.2 | 26.3 |
 |---|---|---|
-| Jar | `farground-1.9.0+26.2.jar` | `farground-1.9.0+26.3.jar` |
+| Jar | `farground-1.11.0+26.2.jar` | `farground-1.11.0+26.3.jar` |
 | Fabric Loader | 0.18+ | 0.18+ |
 | LOD mod (one or both) | Voxy 0.2.19-beta, or Distant Horizons 3.3.3 | Voxy 0.2.20-beta, or Distant Horizons 3.3.4 (tested) |
 | Optional | Mod Menu + Cloth Config (settings screen) | same |
@@ -21,7 +21,7 @@ hosting a LAN world, and on dedicated servers.
 **NeoForge**
 | | 26.2 | 26.3 |
 |---|---|---|
-| Jar | `farground-neoforge-1.9.0+26.2.jar` | `farground-neoforge-1.9.0+26.3.jar` |
+| Jar | `farground-neoforge-1.11.0+26.2.jar` | `farground-neoforge-1.11.0+26.3.jar` |
 | NeoForge | 26.2.0.93+ | 26.3.0.99+ (tested) |
 | LOD mod | Distant Horizons 3.3.3 | Distant Horizons 3.3.4 (tested) |
 | Optional | Cloth Config (settings screen, under Mods → Farground → Config) | same |
@@ -80,6 +80,15 @@ What makes it fast:
 - **Auto-tune**: the first time you're away, it tries several speeds for about 1.5 minutes
   and keeps the smallest one that is within 8% of the fastest. Run it again with
   `/farground autotune`.
+- **Works with C2ME**: with C2ME installed, chunks are built on C2ME's threads, so the
+  auto-tune tries speeds in steps of C2ME's thread count, and tunes again by itself when that
+  count changes. If C2ME is set to fewer threads than its default for your PC,
+  `/farground status` says so: Farground can't go faster than those threads, Turbo included.
+- **Faster with lithostitched** (26.3): worldgen mods built on lithostitched, such as
+  Lithosphere, make Minecraft work out biomes one point at a time. Farground gives them
+  Minecraft's batched version instead, with the same biomes. That speeds up all world
+  generation in those packs: 47 chunks/s instead of 13 in a test with Lithosphere. Setting:
+  `fastModdedBiomes`.
 
 ## Staying out of your way
 - Slows to a trickle while you move or look around, then ramps back up gently once you stand still.
@@ -107,7 +116,7 @@ Singleplayer: anyone. Dedicated server: operators (`/farground status|pause|resu
 | `/farground area <x> <z> <radius>` | Fill a square around a block position at full detail, Chunky-style |
 | `/farground area cancel` | Cancel queued area jobs |
 | `/farground autotune` / `autotune cancel` | Find the best speed for this PC (stand still ~1.5 min) |
-| `/farground prune` / `prune cancel` | When the world closes, delete saved chunks you were never near (see Disk use) |
+| `/farground prune` / `prune cancel` | When the world closes, delete saved far land-shape chunks (see Disk use) |
 | `/farground hud off\|generating\|always` | Progress display in a screen corner |
 | `/farground reset` | Forget progress for your current dimension |
 
@@ -134,8 +143,8 @@ Everything is in **Mod Menu -> Farground** (needs Cloth Config), or `config/farg
 | `frameRateAware` | `true` | Back off when FPS dips |
 | `pauseOnBattery` | `true` | Pause while a laptop is unplugged |
 | `flyAhead` | `true` | Generate ahead when flying fast |
-| `saveUnvisitedChunks` | `true` | `false` = don't save chunks you never visited (experimental, see below) |
-| `hud` | `WHILE_GENERATING` | `OFF`, `WHILE_GENERATING`, `ALWAYS` |
+| `saveFarTerrain` | `false` | `true` = also save far chunks that only have the land shape (see Disk use) |
+| `hud` | `WHILE_GENERATING` | `OFF`, `WHILE_GENERATING` (not for small top-ups as you move around), `ALWAYS` |
 | `hudCorner` | `TOP_LEFT` | Corner for the progress display |
 | `announceDone` | `true` | Chat message when everything in range is done |
 | `tickBudgetMs` | `40` | Back off when the server tick is slower than this |
@@ -143,21 +152,35 @@ Everything is in **Mod Menu -> Farground** (needs Cloth Config), or `config/farg
 | `recenterChunks` | `8` | Restart from your position after moving this far |
 
 ## Disk use
-Generated chunks are saved like explored ones (a few GB at 256 chunks). Setting
-`saveUnvisitedChunks` to `false` skips saving chunks you have never been near: Voxy already has
-their LODs, and they are re-created if you go there. **Experimental**: trees or structures that
-cross the edge between saved and re-created land can end up cut off.
+Most of the land Farground fills in is far away, where it only generates the land shape (no
+trees). Those far chunks aren't saved: your LOD mod already has them, and Minecraft's
+land-shape step only writes into its own chunk, so if you ever go there they are re-created
+exactly the same. Chunks with trees, and the chunks next to them, are always saved, because
+trees spill over into neighbouring chunks and would otherwise be cut off.
 
-The safer way to free space is `/farground prune`. It runs once, after the world has closed
-and saved, and:
-- deletes only chunks that never finished generating (a chunk you have been near is "full"
-  and is never touched),
-- keeps everything within 2 chunks of a full chunk, so nothing at the edge of explored land
-  gets cut,
+While generating, Minecraft also saves early copies of the chunks around the ones it is working
+on. Farground uses those to go faster, then deletes them once it is well past them, and shrinks
+the region files when the world closes (usually well under a second, 20 seconds at most). It only
+deletes copies from before any blocks existed, so they can't hold anything from a neighbour.
+
+Measured on a new world filled out to 128 chunks with full detail to 16: region files were
+59 MB after closing, against 305 MB with everything saved, and generating was no slower. A band
+of early copies stays just outside your generate distance, ready for when it grows.
+
+Tested in-game: an area filled in by Farground, left to unload, then fully loaded again has the
+same trees at its edges as a world Farground never touched, within the small differences any
+two runs have. A control that deleted saved chunks with trees lost about a quarter of the leaves
+along its edge. Set `saveFarTerrain` to `true` to save everything anyway.
+
+`/farground prune` frees the same space in worlds generated before 1.11.0. It runs once, after
+the world has closed and saved, and:
+- deletes only chunks that have just the land shape, and only when no chunk next to them has
+  trees (a chunk you have been near is never touched),
 - copies every region file it changes to `farground-prune-backup` in the world folder first.
 
-Voxy keeps the LODs, so the view doesn't change. If you travel into pruned land, Minecraft
-generates it again (same seed, same terrain). Delete the backup folder once you are happy.
+Your LOD mod keeps the far view, so nothing changes on screen. If you travel into pruned land,
+Minecraft generates it again (same seed, same terrain). Delete the backup folder once you are
+happy.
 
 ## Dedicated servers
 Put Farground and your LOD mod on the server:
@@ -188,7 +211,9 @@ gradlew -p neoforge build -Pmc=26.3
 The jars end up in `build/libs/` and `neoforge/build/libs/`. Library versions for each
 Minecraft version are in `versions/<mc>.properties` and `neoforge/versions/<mc>.properties`.
 Code that only one loader needs goes in `src/main/java/dev/farground/fabric/` or
-`neoforge/src/`; everything else talks to the loader through `Platform`.
+`neoforge/src/`; everything else talks to the loader through `Platform`. Code and mixins for one
+Minecraft version only go in `src/mc<version>/` (both builds add it). More in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 If Gradle fails with "Unable to establish loopback connection" on Windows, point Java's local
 sockets somewhere outside the temp folder first:

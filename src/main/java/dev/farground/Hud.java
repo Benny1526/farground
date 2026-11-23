@@ -19,7 +19,7 @@ public final class Hud {
 
 		String reason = gen.waitingReason;
 		boolean done = reason.startsWith("done");
-		if (cfg.hud == FargroundConfig.HudMode.WHILE_GENERATING && done) return;
+		if (cfg.hud == FargroundConfig.HudMode.WHILE_GENERATING && (done || gen.onlyToppingUp())) return;
 
 		String text;
 		if (done) text = Tr.str("farground.hud.done");

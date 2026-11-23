@@ -88,6 +88,10 @@ public final class FargroundConfig {
 	public boolean autoTuneOnFirstAfk = true;
 	/** Set after an auto-tune has picked maxConcurrent for this PC. */
 	public boolean autoTuned = false;
+	/** C2ME's world-gen thread count when the auto-tune ran (0 = no C2ME, or tuned before this was recorded). */
+	public int tunedForC2meThreads = 0;
+	/** The speed was tuned with the faster modded-biome climate in use (see fastModdedBiomes). */
+	public boolean tunedWithFastBiomes = false;
 	/** Start a new spiral once the player moves this many chunks from the last center. */
 	public int recenterChunks = 8;
 	/** Keep finished chunks loaded this many ticks so their neighbors can reuse them. */
@@ -95,11 +99,22 @@ public final class FargroundConfig {
 
 	// ---- Disk ----
 	/**
-	 * Save generated chunks you have never visited. Turning this off saves a lot of disk space,
-	 * but those chunks are re-created if you go there, and trees or structures right on the edge
-	 * of where you have explored can end up cut off. Experimental.
+	 * Save the far, terrain-only chunks (land shape only, no trees). Off (the default) skips
+	 * them: Voxy/DH already have their LODs, and Minecraft's terrain step only writes into its
+	 * own chunk, so if you ever go there they are re-created exactly the same. Chunks with trees,
+	 * and terrain chunks next to them, are always saved, so nothing gets cut off.
+	 * Replaces the old experimental saveUnvisitedChunks, which also skipped chunks with trees.
 	 */
-	public boolean saveUnvisitedChunks = true;
+	public boolean saveFarTerrain = false;
+
+	// ---- Compatibility ----
+	/**
+	 * Work out a chunk's biome climate in one batch for biome sources from mods that would
+	 * otherwise sample it one point at a time (lithostitched's biome injector, used by many
+	 * worldgen mods). Same biomes, much less work per chunk. Applies to all chunk generation,
+	 * not only Farground's. Turn off only if a biome mod misbehaves with it.
+	 */
+	public boolean fastModdedBiomes = true;
 
 	// ---- Display ----
 	public HudMode hud = HudMode.WHILE_GENERATING;

@@ -75,6 +75,25 @@ public final class DoneIndex {
 		}
 	}
 
+	/** Is any chunk inside the square [x0..x1] x [z0..z1] done at full detail? */
+	public boolean anyFullInSquare(int x0, int z0, int x1, int z1) {
+		for (int rx = x0 >> 5; rx <= x1 >> 5; rx++) {
+			for (int rz = z0 >> 5; rz <= z1 >> 5; rz++) {
+				long[] bits = full.get(((long) rx << 32) | (rz & 0xFFFFFFFFL));
+				if (bits == null) continue;
+				int xFrom = Math.max(x0, rx << 5), xTo = Math.min(x1, (rx << 5) + 31);
+				int zFrom = Math.max(z0, rz << 5), zTo = Math.min(z1, (rz << 5) + 31);
+				for (int z = zFrom; z <= zTo; z++) {
+					for (int x = xFrom; x <= xTo; x++) {
+						int b = bit(x, z);
+						if ((bits[b >>> 6] & (1L << b)) != 0) return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
 	/** Chunks done (either quality) anywhere in this dimension. */
 	public long count() {
 		return fullCount + terrainCount;

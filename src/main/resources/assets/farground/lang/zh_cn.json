@@ -16,7 +16,7 @@
 	"farground.cmd.movingspeed_pause": "移动或转视角时暂停。",
 	"farground.cmd.autotune": "速度测试已排队：地形生成时请站着不动。大约需要 1.5 分钟。",
 	"farground.cmd.autotune_cancel": "速度测试已取消，之后不会再自动开始。",
-	"farground.cmd.prune": "关闭这个世界时，会从磁盘删除你从未靠近过的区块以节省空间。画面不会变化（LOD 模组会保留远景地形）。被修改的文件会先备份。使用 /farground prune cancel 撤销。",
+	"farground.cmd.prune": "关闭这个世界时，会从磁盘删除只有地形形状（没有树木）的远处区块以节省空间。你去那里时会重新生成完全一样的地形，LOD 模组会保留远景。被修改的文件会先备份。使用 /farground prune cancel 撤销。",
 	"farground.cmd.prune_cancel": "清理已取消。",
 	"farground.cmd.prune_none": "没有已计划的清理。",
 	"farground.cmd.area": "已排队：以 %s, %s 为中心，%s 个区块范围内的完整细节。",
@@ -30,6 +30,8 @@
 	"farground.status.session": "本次会话：%s 个区块（完整细节 %s 个，失败 %s 个），当前 %s/秒",
 	"farground.status.eta": "此维度你周围剩余约%s（最近平均 %s/s）",
 	"farground.status.limits": "正在生成 %s 个，上限 %s（静止：%s，移动：%s）| 服务器刻 %s 毫秒",
+	"farground.status.c2me": "C2ME：区块在 %s 个线程上生成",
+	"farground.status.c2me_low": "C2ME 的世界生成线程被限制为 %s 个（这台电脑的默认值：%s），所以 Farground 无法更快。请在 config/c2me.toml 中设置 globalExecutorParallelism = \"default\" 并重启。",
 	"farground.status.full_detail": "完整细节范围 %s 个区块%s%s",
 	"farground.status.auto_voxy": "（自动，根据 Voxy 的细节设置）",
 	"farground.status.auto": "（自动）",
@@ -39,7 +41,7 @@
 	"farground.status.battery": "已暂停：正在使用电池（关闭“使用电池时暂停”即可更改）",
 	"farground.status.prune_scheduled": "已计划在关闭此世界时清理（/farground prune cancel 撤销）",
 
-	"farground.prune.result": "上次清理：从 %2$s 个文件中删除了 %1$s 个未访问的区块，%3$s MB -> %4$s MB（备份在 %5$s）",
+	"farground.prune.result": "上次清理：从 %2$s 个文件中删除了 %1$s 个纯地形区块，%3$s MB -> %4$s MB（备份在 %5$s）",
 	"farground.prune.failed": "上次清理失败：%s（出错后没有修改任何文件）",
 
 	"farground.reason.starting": "正在启动",
@@ -217,13 +219,13 @@
 	"farground.config.fly_ahead": "飞行时向前生成",
 	"farground.config.fly_ahead.tooltip": "快速飞行时，在你前进方向的前方生成，\n而不是在你当前位置周围。",
 
-	"farground.config.save_unvisited": "保存从未访问的区块",
-	"farground.config.save_unvisited.tooltip": "保留你从未靠近过的已生成区块。\n关闭：去到那里时会重新生成，\n已探索区域边缘的树木或结构可能会被截断。",
-	"farground.config.save_unvisited.why.on": "占用更多磁盘空间（256 个区块时约数 GB）。",
-	"farground.config.save_unvisited.why.off": "节省磁盘空间。实验性功能。",
+	"farground.config.save_far_terrain": "保存远处的纯地形区块",
+	"farground.config.save_far_terrain.tooltip": "保存只有地形形状（没有树木）的远处区块。\n关闭：不保存它们。LOD 模组已经有了它们，你去那里时\n会重新生成完全一样的地形。有树木的区块及其相邻区块\n总会被保存。",
+	"farground.config.save_far_terrain.why.on": "占用更多磁盘空间（256 区块时约 1 GB）。",
+	"farground.config.save_far_terrain.why.off": "节省磁盘空间。安全：不会截断任何东西。",
 
 	"farground.config.prune": "关闭世界时释放磁盘空间",
-	"farground.config.prune.tooltip": "关闭世界时，删除你从未靠近过的已保存区块。\nLOD 模组会保留远景。被修改的文件会先备份。\n与 /farground prune 相同。只运行一次。",
+	"farground.config.prune.tooltip": "关闭世界时，删除只有地形形状（没有树木）的已保存远处区块。\nLOD 模组会保留远景。被修改的文件会先备份。\n与 /farground prune 相同。只运行一次。",
 	"farground.config.prune.why": "关闭世界会多花几秒钟，仅一次。",
 
 	"farground.config.hud": "进度显示",

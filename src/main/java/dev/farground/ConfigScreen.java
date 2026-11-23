@@ -231,9 +231,9 @@ public final class ConfigScreen {
 
 		// ---------------------------------------------------------------- Disk
 		ConfigCategory disk = b.getOrCreateCategory(label("category.disk"));
-		disk.addEntry(e.startBooleanToggle(label("save_unvisited"), c.saveUnvisitedChunks).setDefaultValue(d.saveUnvisitedChunks)
-				.setTooltipSupplier(v -> tip("save_unvisited", null, Impact.LOW, v ? "save_unvisited.why.on" : "save_unvisited.why.off"))
-				.setSaveConsumer(v -> c.saveUnvisitedChunks = v).build());
+		disk.addEntry(e.startBooleanToggle(label("save_far_terrain"), c.saveFarTerrain).setDefaultValue(d.saveFarTerrain)
+				.setTooltipSupplier(v -> tip("save_far_terrain", null, Impact.LOW, v ? "save_far_terrain.why.on" : "save_far_terrain.why.off"))
+				.setSaveConsumer(v -> c.saveFarTerrain = v).build());
 		disk.addEntry(e.startBooleanToggle(label("prune"), Farground.pruneRequested).setDefaultValue(false)
 				.setTooltipSupplier(v -> tip("prune", null, Impact.LOW, v ? "prune.why" : null))
 				.setSaveConsumer(v -> Farground.pruneRequested = v).build());

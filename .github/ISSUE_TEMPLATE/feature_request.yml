@@ -1,0 +1,30 @@
+name: Feature request
+description: An idea for something Farground could do, or do better.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like?
+      description: What you want to be able to do, and why. The problem you run into is more useful than a finished design.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could it work?
+      description: Optional. A command, a setting, how it should behave.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: loader
+    attributes:
+      label: Loader you play on
+      options:
+        - Fabric
+        - NeoForge
+        - Both
+    validations:
+      required: false

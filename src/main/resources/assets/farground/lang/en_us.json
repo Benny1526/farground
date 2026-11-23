@@ -16,7 +16,7 @@
 	"farground.cmd.movingspeed_pause": "Paused while you move or look around.",
 	"farground.cmd.autotune": "Speed tune queued: stand still while terrain generates. Takes about 1.5 minutes.",
 	"farground.cmd.autotune_cancel": "Speed tune cancelled. It won't start on its own again.",
-	"farground.cmd.prune": "When you close this world, chunks you've never been near will be removed from disk to save space. Your view stays the same (your LOD mod keeps the far terrain). Changed files are backed up first. Use /farground prune cancel to undo.",
+	"farground.cmd.prune": "When you close this world, far chunks that only have the land shape (no trees) will be removed from disk to save space. They're re-created exactly the same if you go there, and your LOD mod keeps the far view. Changed files are backed up first. Use /farground prune cancel to undo.",
 	"farground.cmd.prune_cancel": "Prune cancelled.",
 	"farground.cmd.prune_none": "No prune was scheduled.",
 	"farground.cmd.area": "Queued: %s chunks around %s, %s at full detail.",
@@ -30,6 +30,8 @@
 	"farground.status.session": "This session: %s chunks (%s full detail, %s failed), now %s/s",
 	"farground.status.eta": "About %s left around you in this dimension, at the recent average of %s/s",
 	"farground.status.limits": "%s generating, limit %s (still: %s, moving: %s) | server tick %s ms",
+	"farground.status.c2me": "C2ME: chunks are built on %s threads",
+	"farground.status.c2me_low": "C2ME is limited to %s world-gen threads (its default for this PC: %s), so Farground can't go faster. Set globalExecutorParallelism = \"default\" in config/c2me.toml and restart.",
 	"farground.status.full_detail": "Full detail out to %s chunks%s%s",
 	"farground.status.auto_voxy": " (automatic, from Voxy's detail setting)",
 	"farground.status.auto": " (automatic)",
@@ -39,7 +41,7 @@
 	"farground.status.battery": "Paused: running on battery (turn off \"Pause on battery\" to change this)",
 	"farground.status.prune_scheduled": "Prune is scheduled for when this world closes (/farground prune cancel to undo)",
 
-	"farground.prune.result": "Last prune: removed %s unvisited chunks from %s files, %s MB -> %s MB (backup in %s)",
+	"farground.prune.result": "Last prune: removed %s land-shape chunks from %s files, %s MB -> %s MB (backup in %s)",
 	"farground.prune.failed": "Last prune failed: %s (no files were changed after the error)",
 
 	"farground.reason.starting": "starting",
@@ -217,13 +219,13 @@
 	"farground.config.fly_ahead": "Generate ahead when flying",
 	"farground.config.fly_ahead.tooltip": "When flying fast, generates ahead of where you're\nheading instead of around where you are.",
 
-	"farground.config.save_unvisited": "Save chunks you never visited",
-	"farground.config.save_unvisited.tooltip": "Keep generated chunks you have never been near.\nOff: they're re-created if you go there, and trees or\nstructures right at the edge of explored land can be cut off.",
-	"farground.config.save_unvisited.why.on": "Uses more disk space (a few GB at 256 chunks).",
-	"farground.config.save_unvisited.why.off": "Saves disk space. Experimental.",
+	"farground.config.save_far_terrain": "Save far land-shape chunks",
+	"farground.config.save_far_terrain.tooltip": "Save the far chunks that only have the land shape (no trees).\nOff: they're skipped. Your LOD mod already has them, and if you\ngo there they're re-created exactly the same. Chunks with trees,\nand the chunks next to them, are always saved.",
+	"farground.config.save_far_terrain.why.on": "Uses more disk space (about 1 GB at 256 chunks).",
+	"farground.config.save_far_terrain.why.off": "Saves disk space. Safe: nothing gets cut off.",
 
 	"farground.config.prune": "Free disk space on world close",
-	"farground.config.prune.tooltip": "When the world closes, deletes saved chunks you were\nnever near. Your LOD mod keeps the far view. Changed files are\nbacked up first. Same as /farground prune. Runs once.",
+	"farground.config.prune.tooltip": "When the world closes, deletes saved far chunks that only have\nthe land shape (no trees). Your LOD mod keeps the far view. Changed\nfiles are backed up first. Same as /farground prune. Runs once.",
 	"farground.config.prune.why": "Closing the world takes a few seconds longer, once.",
 
 	"farground.config.hud": "Progress display",

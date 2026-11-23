@@ -3,6 +3,7 @@ package dev.farground;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -38,6 +39,13 @@ public final class FargroundCommands {
 		long left = g.secondsLeft();
 		if (left >= 0) out.add(indent(tr("farground.status.eta", Tr.duration(left), n(g.averageRate))));
 		out.add(indent(tr("farground.status.limits", g.lastInFlight, g.lastLimit, cfg.maxConcurrent, cfg.activeConcurrent, n1(g.lastMspt))));
+		C2meBridge.Threads c2me = C2meBridge.threads();
+		if (c2me != null && c2me.belowDefault()) {
+			// Farground can't go faster than C2ME's thread pool, and a hand-set low count is easy to forget.
+			out.add(indent(tr("farground.status.c2me_low", c2me.threads(), c2me.defaultThreads()).withStyle(ChatFormatting.YELLOW)));
+		} else if (c2me != null) {
+			out.add(indent(tr("farground.status.c2me", c2me.threads())));
+		}
 		Object auto = cfg.fullDetailRadius >= 0 ? ""
 				: Platform.isModLoaded("voxy") ? tr("farground.status.auto_voxy")
 				: tr("farground.status.auto");

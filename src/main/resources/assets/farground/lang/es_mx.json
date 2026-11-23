@@ -16,7 +16,7 @@
 	"farground.cmd.movingspeed_pause": "En pausa mientras te mueves o miras alrededor.",
 	"farground.cmd.autotune": "Ajuste de velocidad en cola: quédate quieto mientras se genera el terreno. Tarda unos 1,5 minutos.",
 	"farground.cmd.autotune_cancel": "Ajuste de velocidad cancelado. No volverá a empezar solo.",
-	"farground.cmd.prune": "Al cerrar este mundo se borrarán del disco los chunks a los que nunca te has acercado, para ahorrar espacio. La vista no cambia (tu mod de LOD conserva el terreno lejano). Antes se hace una copia de los archivos modificados. Usa /farground prune cancel para deshacerlo.",
+	"farground.cmd.prune": "Al cerrar este mundo se borrarán del disco los chunks lejanos que solo tienen la forma del terreno (sin árboles), para ahorrar espacio. Si vas allí se vuelven a crear exactamente iguales, y tu mod de LOD conserva la vista lejana. Antes se hace una copia de los archivos modificados. Usa /farground prune cancel para deshacerlo.",
 	"farground.cmd.prune_cancel": "Limpieza cancelada.",
 	"farground.cmd.prune_none": "No había ninguna limpieza programada.",
 	"farground.cmd.area": "En cola: %s chunks alrededor de %s, %s con detalle completo.",
@@ -30,6 +30,8 @@
 	"farground.status.session": "Esta sesión: %s chunks (%s con detalle completo, %s fallidos), ahora %s/s",
 	"farground.status.eta": "Faltan unos %s a tu alrededor en esta dimensión, al promedio reciente de %s/s",
 	"farground.status.limits": "%s generándose, límite %s (quieto: %s, en movimiento: %s) | tick del servidor %s ms",
+	"farground.status.c2me": "C2ME: los chunks se generan en %s hilos",
+	"farground.status.c2me_low": "C2ME está limitado a %s hilos de generación (su valor predeterminado en este PC: %s), así que Farground no puede ir más rápido. Pon globalExecutorParallelism = \"default\" en config/c2me.toml y reinicia.",
 	"farground.status.full_detail": "Detalle completo hasta %s chunks%s%s",
 	"farground.status.auto_voxy": " (automático, según el ajuste de detalle de Voxy)",
 	"farground.status.auto": " (automático)",
@@ -39,7 +41,7 @@
 	"farground.status.battery": "En pausa: funcionando con batería (desactiva \"Pausar con batería\" para cambiarlo)",
 	"farground.status.prune_scheduled": "Hay una limpieza programada para cuando se cierre este mundo (/farground prune cancel para deshacerlo)",
 
-	"farground.prune.result": "Última limpieza: %s chunks no visitados eliminados de %s archivos, %s MB -> %s MB (copia en %s)",
+	"farground.prune.result": "Última limpieza: %s chunks solo de terreno eliminados de %s archivos, %s MB -> %s MB (copia en %s)",
 	"farground.prune.failed": "La última limpieza falló: %s (no se cambió ningún archivo después del error)",
 
 	"farground.reason.starting": "iniciando",
@@ -217,13 +219,13 @@
 	"farground.config.fly_ahead": "Generar por delante al volar",
 	"farground.config.fly_ahead.tooltip": "Al volar rápido, genera por delante de hacia donde vas\nen lugar de alrededor de donde estás.",
 
-	"farground.config.save_unvisited": "Guardar los chunks que nunca visitaste",
-	"farground.config.save_unvisited.tooltip": "Conserva los chunks generados a los que nunca te has acercado.\nDesactivado: se vuelven a crear si vas allí, y los árboles o\nestructuras justo en el borde del terreno explorado pueden quedar cortados.",
-	"farground.config.save_unvisited.why.on": "Usa más espacio en disco (unos GB a 256 chunks).",
-	"farground.config.save_unvisited.why.off": "Ahorra espacio en disco. Experimental.",
+	"farground.config.save_far_terrain": "Guardar chunks lejanos solo de terreno",
+	"farground.config.save_far_terrain.tooltip": "Guarda los chunks lejanos que solo tienen la forma del terreno (sin árboles).\nDesactivado: no se guardan. Tu mod de LOD ya los tiene y, si vas allí,\nse vuelven a crear exactamente iguales. Los chunks con árboles,\ny los que están a su lado, siempre se guardan.",
+	"farground.config.save_far_terrain.why.on": "Usa más espacio en disco (alrededor de 1 GB con 256 chunks).",
+	"farground.config.save_far_terrain.why.off": "Ahorra espacio en disco. Seguro: nada queda cortado.",
 
 	"farground.config.prune": "Liberar espacio al cerrar el mundo",
-	"farground.config.prune.tooltip": "Al cerrar el mundo, borra los chunks guardados a los que nunca\nte acercaste. Tu mod de LOD conserva la vista lejana. Antes se hace\nuna copia de los archivos modificados. Igual que /farground prune. Se hace una vez.",
+	"farground.config.prune.tooltip": "Al cerrar el mundo, borra los chunks lejanos guardados que solo tienen\nla forma del terreno (sin árboles). Tu mod de LOD conserva la vista lejana.\nAntes se hace una copia de los archivos modificados. Igual que /farground prune. Se hace una vez.",
 	"farground.config.prune.why": "Cerrar el mundo tarda unos segundos más, una vez.",
 
 	"farground.config.hud": "Indicador de progreso",

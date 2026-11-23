@@ -1,5 +1,10 @@
 # Publishing Farground on Modrinth
 
+> **This is the first-time setup guide** (creating the project page). For a new release, use
+> `modrinth-kit/CHECKLIST.md` and `RELEASE-<version>.md` instead. The file names and the Beta channel
+> below are from the first upload (1.7.0); releases since 1.9.0 use the Release channel and
+> include NeoForge jars.
+
 1. Sign in at modrinth.com → **Create a project** → type **Mod**, name **Farground**.
 2. Summary: "Fast, lightweight background terrain generation for Voxy and Distant Horizons."
 3. Description: paste `MODRINTH.md`.

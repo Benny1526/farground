@@ -24,11 +24,13 @@ sourceSets {
 	main {
 		java {
 			srcDir '../src/main/java'
+			srcDir "../src/mc${mcTarget}/java"
 			exclude 'dev/farground/fabric/**'
 		}
 		resources {
 			srcDir '../src/main/resources'
-			exclude 'fabric.mod.json', 'farground.accesswidener'
+			srcDir "../src/mc${mcTarget}/resources"
+			exclude 'fabric.mod.json'
 		}
 	}
 }

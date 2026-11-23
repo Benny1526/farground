@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and help
+    url: https://modrinth.com/mod/farground
+    about: How-to questions are welcome in the comments on Modrinth or CurseForge. Use an issue here for bugs and feature requests.
+  - name: Security problem
+    url: https://github.com/Benny1526/farground/security/policy
+    about: Please report security problems privately, not in a public issue.

@@ -11,9 +11,11 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -27,11 +29,13 @@ import java.util.stream.Stream;
  *
  * Safety rules:
  *  - Runs only after the world has fully closed and saved (never while chunks are in use).
- *  - Deletes only chunks that never finished generating (status is not "full"). A full chunk is
- *    one a player has been near, so it is never touched.
- *  - Also keeps any chunk within 2 chunks of a full chunk, so trees and structures that cross
- *    from visited land into unvisited land are never cut.
- *  - Keeps oversized chunks stored in separate .mcc files.
+ *  - Deletes only chunks that have just the land shape (generated no further than the terrain
+ *    step). Minecraft's terrain step writes into its own chunk only, so such a chunk is
+ *    re-created exactly the same. Chunks with trees, plants or structures placed, and every
+ *    chunk a player has been near, are never touched.
+ *  - Also keeps any land-shape chunk next to a decorated one: trees spill into the chunks around
+ *    them, and those parts would be lost.
+ *  - Keeps oversized chunks stored in separate .mcc files, and anything it can't read.
  *  - Copies every region file it changes to "farground-prune-backup" first.
  */
 public final class Pruner {
@@ -44,8 +48,8 @@ public final class Pruner {
 
 	public static Result prune(Path worldRoot, List<Path> regionDirs) throws IOException {
 		Path backupRoot = worldRoot.resolve("farground-prune-backup");
-		// Pass 1: find every finished ("full") chunk across all region files.
-		LongOpenHashSet full = new LongOpenHashSet();
+		// Pass 1: find every chunk that has been decorated (or can't be read) across all region files.
+		LongOpenHashSet decorated = new LongOpenHashSet();
 		List<Path> files = new ArrayList<>();
 		for (Path dir : regionDirs) {
 			if (!Files.isDirectory(dir)) continue;
@@ -59,8 +63,8 @@ public final class Pruner {
 			for (int i = 0; i < 1024; i++) {
 				String status = status(data, i);
 				if (status == null) continue;
-				if (status.equals("minecraft:full") || status.equals("full") || status.equals("EXTERNAL")) {
-					full.add(pack(rc[0] * 32 + (i & 31), rc[1] * 32 + (i >> 5)));
+				if (!landShapeOnly(status)) {
+					decorated.add(pack(rc[0] * 32 + (i & 31), rc[1] * 32 + (i >> 5)));
 				}
 			}
 		}
@@ -76,9 +80,9 @@ public final class Pruner {
 			int dropCount = 0;
 			for (int i = 0; i < 1024; i++) {
 				String status = status(data, i);
-				if (status == null || status.equals("EXTERNAL") || status.equals("minecraft:full") || status.equals("full")) continue;
+				if (status == null || !landShapeOnly(status)) continue;
 				int cx = rc[0] * 32 + (i & 31), cz = rc[1] * 32 + (i >> 5);
-				if (nearFull(full, cx, cz, 2)) continue;
+				if (near(decorated, cx, cz, 1)) continue;
 				drop[i] = true;
 				dropCount++;
 			}
@@ -102,10 +106,79 @@ public final class Pruner {
 		return new Result(changed, removed, before, after, backupRoot);
 	}
 
-	private static boolean nearFull(LongOpenHashSet full, int cx, int cz, int r) {
+	public record Compacted(int files, long bytesBefore, long bytesAfter) {}
+
+	/**
+	 * Closes the gaps left in region files by removed chunks (Minecraft reuses the gaps but never
+	 * shrinks a file). Every chunk is copied unchanged, so no backup is needed. Files with anything
+	 * odd in their table are left alone. Run only after the world has closed. Stops after maxMillis;
+	 * what is left gets its turn the next time.
+	 */
+	public static Compacted compact(List<Path> regionDirs, long maxMillis) throws IOException {
+		long deadline = System.nanoTime() + maxMillis * 1_000_000L;
+		int changed = 0;
+		long before = 0, after = 0;
+		for (Path dir : regionDirs) {
+			if (!Files.isDirectory(dir)) continue;
+			List<Path> files;
+			try (Stream<Path> s = Files.list(dir)) {
+				files = s.filter(p -> REGION.matcher(p.getFileName().toString()).matches()).toList();
+			}
+			for (Path f : files) {
+				if (System.nanoTime() > deadline) return new Compacted(changed, before, after);
+				long size = Files.size(f);
+				if (!worthCompacting(f, size)) continue;
+				byte[] out = rewrite(Files.readAllBytes(f), new boolean[1024]);
+				Path tmp = f.resolveSibling(f.getFileName() + ".farground.tmp");
+				Files.write(tmp, out);
+				try {
+					Files.move(tmp, f, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+				} catch (java.nio.file.AtomicMoveNotSupportedException e) {
+					Files.move(tmp, f, StandardCopyOption.REPLACE_EXISTING);
+				}
+				changed++;
+				before += size;
+				after += out.length;
+			}
+		}
+		return new Compacted(changed, before, after);
+	}
+
+	/** True if at least a quarter of the file (and 256 KB) is unused and its table looks sound. */
+	private static boolean worthCompacting(Path f, long size) throws IOException {
+		if (size < 2L * SECTOR) return false;
+		ByteBuffer header = ByteBuffer.allocate(SECTOR);
+		try (FileChannel ch = FileChannel.open(f, StandardOpenOption.READ)) {
+			while (header.hasRemaining() && ch.read(header, header.position()) > 0) { }
+		}
+		if (header.hasRemaining()) return false;
+		long fileSectors = (size + SECTOR - 1) / SECTOR, used = 2;
+		for (int i = 0; i < 1024; i++) {
+			int loc = header.getInt(i * 4);
+			if (loc == 0) continue;
+			int offset = loc >>> 8, count = loc & 0xFF;
+			if (offset < 2 || count == 0 || offset + (long) count > fileSectors) return false;
+			used += count;
+		}
+		long free = fileSectors - used;
+		return free >= 64 && free * 4 >= fileSectors; // a negative "free" means overlapping chunks
+	}
+
+	/** Statuses up to and including the terrain step (26.2 calls its last ones noise/surface/carvers). */
+	private static final java.util.Set<String> LAND_SHAPE = java.util.Set.of(
+			"empty", "structure_starts", "structure_references", "biomes",
+			"noise", "surface", "carvers", "terrain");
+
+	/** True for a chunk generated no further than the land shape, so nothing spilled out of it. */
+	static boolean landShapeOnly(String status) {
+		String s = status.startsWith("minecraft:") ? status.substring("minecraft:".length()) : status;
+		return LAND_SHAPE.contains(s);
+	}
+
+	private static boolean near(LongOpenHashSet set, int cx, int cz, int r) {
 		for (int dx = -r; dx <= r; dx++)
 			for (int dz = -r; dz <= r; dz++)
-				if (full.contains(pack(cx + dx, cz + dz))) return true;
+				if (set.contains(pack(cx + dx, cz + dz))) return true;
 		return false;
 	}
 

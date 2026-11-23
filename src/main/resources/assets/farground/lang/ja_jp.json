@@ -16,7 +16,7 @@
 	"farground.cmd.movingspeed_pause": "移動中や視点を動かしている間は一時停止します。",
 	"farground.cmd.autotune": "速度テストを予約しました：地形の生成中は動かないでください。約 1.5 分かかります。",
 	"farground.cmd.autotune_cancel": "速度テストを取り消しました。もう自動では始まりません。",
-	"farground.cmd.prune": "このワールドを閉じるとき、一度も近づいていないチャンクをディスクから削除して容量を空けます。見た目は変わりません（遠景は LOD Mod が保持します）。変更するファイルは先にバックアップされます。取り消すには /farground prune cancel を使ってください。",
+	"farground.cmd.prune": "このワールドを閉じるとき、地形の形だけ（木なし）の遠くのチャンクをディスクから削除して容量を空けます。そこへ行くとまったく同じに作り直され、遠景は LOD Mod が保持します。変更するファイルは先にバックアップされます。取り消すには /farground prune cancel を使ってください。",
 	"farground.cmd.prune_cancel": "整理を取り消しました。",
 	"farground.cmd.prune_none": "予定されている整理はありません。",
 	"farground.cmd.area": "予約しました：%2$s, %3$s を中心に %1$s チャンクを完全な詳細で生成します。",
@@ -30,6 +30,8 @@
 	"farground.status.session": "このセッション：%s チャンク（完全な詳細 %s、失敗 %s）、現在 %s/秒",
 	"farground.status.eta": "このディメンションの周囲は残り約%s（最近の平均 %s/s）",
 	"farground.status.limits": "生成中 %s、上限 %s（停止中：%s、移動中：%s）| サーバーティック %s ms",
+	"farground.status.c2me": "C2ME：チャンクは %s スレッドで生成されています",
+	"farground.status.c2me_low": "C2ME のワールド生成スレッドが %s に制限されています（この PC での既定値：%s）。そのため Farground はこれ以上速くなりません。config/c2me.toml で globalExecutorParallelism = \"default\" にして再起動してください。",
 	"farground.status.full_detail": "完全な詳細は %s チャンクまで%s%s",
 	"farground.status.auto_voxy": "（自動、Voxy の詳細設定から）",
 	"farground.status.auto": "（自動）",
@@ -39,7 +41,7 @@
 	"farground.status.battery": "一時停止：バッテリー駆動中（変更するには「バッテリー時は一時停止」をオフに）",
 	"farground.status.prune_scheduled": "このワールドを閉じるときに整理する予定です（/farground prune cancel で取り消し）",
 
-	"farground.prune.result": "前回の整理：%2$s 個のファイルから未訪問チャンクを %1$s 個削除、%3$s MB -> %4$s MB（バックアップ先 %5$s）",
+	"farground.prune.result": "前回の整理：%2$s 個のファイルから地形だけのチャンクを %1$s 個削除、%3$s MB -> %4$s MB（バックアップ先 %5$s）",
 	"farground.prune.failed": "前回の整理に失敗しました：%s（エラーの後はファイルを変更していません）",
 
 	"farground.reason.starting": "起動中",
@@ -217,13 +219,13 @@
 	"farground.config.fly_ahead": "飛行中は前方を生成",
 	"farground.config.fly_ahead.tooltip": "速く飛んでいるときは、今いる場所の周りではなく、\n進んでいる方向の先を生成します。",
 
-	"farground.config.save_unvisited": "一度も訪れていないチャンクを保存",
-	"farground.config.save_unvisited.tooltip": "一度も近づいていない生成済みチャンクを残します。\nオフ：そこへ行くと作り直され、探索済みの境目にある\n木や構造物が途中で切れることがあります。",
-	"farground.config.save_unvisited.why.on": "ディスクをより使います（256 チャンクで数 GB）。",
-	"farground.config.save_unvisited.why.off": "ディスクを節約します。実験的な機能です。",
+	"farground.config.save_far_terrain": "遠くの地形だけのチャンクを保存",
+	"farground.config.save_far_terrain.tooltip": "地形の形だけ（木なし）の遠くのチャンクを保存します。\nオフ：保存しません。LOD Mod はすでに持っていて、そこへ行くと\nまったく同じに作り直されます。木のあるチャンクと、その隣の\nチャンクは常に保存されます。",
+	"farground.config.save_far_terrain.why.on": "ディスクをより多く使います（256 チャンクで約 1 GB）。",
+	"farground.config.save_far_terrain.why.off": "ディスク容量を節約します。安全：何も切れません。",
 
 	"farground.config.prune": "ワールドを閉じるときに容量を空ける",
-	"farground.config.prune.tooltip": "ワールドを閉じるとき、一度も近づいていない保存済みチャンクを削除します。\n遠景は LOD Mod が保持します。変更するファイルは先にバックアップされます。\n/farground prune と同じです。一度だけ実行されます。",
+	"farground.config.prune.tooltip": "ワールドを閉じるとき、地形の形だけ（木なし）の保存済みの遠くのチャンクを削除します。\n遠景は LOD Mod が保持します。変更するファイルは先にバックアップされます。\n/farground prune と同じです。一度だけ実行されます。",
 	"farground.config.prune.why": "ワールドを閉じるのが一度だけ数秒長くなります。",
 
 	"farground.config.hud": "進捗表示",

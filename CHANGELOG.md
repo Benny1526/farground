@@ -1,5 +1,67 @@
 # Changelog
 
+## 1.11.0 - far land no longer fills your disk, better with C2ME
+- **Far chunks aren't saved any more.** Most of what Farground fills in is far land where it only
+  generates the land shape (no trees). Your LOD mod already has those chunks, and Minecraft's
+  land-shape step only writes into its own chunk, so they are re-created exactly the same if you
+  ever go there.
+- **Leftover early copies are cleaned up.** Minecraft saves early versions of the chunks around
+  the ones being generated. Farground deletes them once it is well past them and shrinks the
+  region files when the world closes. Measured on a new world filled out to 128 chunks with full
+  detail to 16: 59 MB after closing, against 305 MB with everything saved, and no slower.
+- **Nothing gets cut off.** Chunks with trees, and the chunks next to them, are always saved,
+  because trees spill into neighbouring chunks. Tested in-game: an area filled in by Farground,
+  unloaded and then loaded again has the same trees at the edges as a world Farground never
+  touched, within the small differences any two runs have; a control that deleted saved chunks
+  with trees lost about a quarter of the leaves along its edge.
+- **Replaces the experimental `saveUnvisitedChunks`** setting, which also skipped chunks with
+  trees and could cut them off. The new setting is `saveFarTerrain` (off by default).
+- **`/farground prune` uses the same safe rule.** It now deletes only land-shape chunks with no
+  trees next to them. Before, it kept everything within 2 chunks of land you had visited, but
+  could cut trees along the edge of what it kept. Use it to free the space in worlds generated
+  before this update: in a test world, 46 MB -> 12 MB.
+
+- **Better with C2ME.** With C2ME installed, every chunk is built on C2ME's thread pool, so
+  its size caps the speed. The auto-tune now tries multiples of C2ME's thread count (for 13
+  threads: 13, 26, 39, 52, 78, 104, 130 at once), remembers the count it tuned for, and when
+  the count changes it scales the setting right away and tunes again the next time you are
+  away. Worlds tuned before this update tune once more.
+- **Warning for a low C2ME thread count.** If C2ME is set to fewer world-gen threads than its
+  own default for your PC, `/farground status` says so in yellow, with the setting to change,
+  and the game log warns at startup. This was the cause of Turbo seeming slow on one PC: C2ME
+  was set to 6 threads instead of 13, and every speed from 24 to 128 at once came out at
+  about 40 chunks/s.
+
+- **Up to 3.5x faster world generation with lithostitched** (26.3). lithostitched, a library
+  used by many worldgen mods (Lithosphere among them), wraps the world's biome source, and its
+  wrapper doesn't have 26.3's new whole-chunk biome method. Minecraft then works out a chunk's
+  biome climate one point at a time instead of in one batch: 2,304 separate samples per chunk
+  with Lithosphere, about 60 ms of work per chunk. Farground now hands such biome sources the
+  climate computed in one batch, the way Minecraft does for its own. This speeds up all chunk
+  generation in those packs, not only Farground's, and the biomes are the same. Tested with
+  lithostitched 2.0.6 and Lithosphere 1.9: all 921,600 biome points of 400 chunks spread
+  across 31,000 blocks (41 biomes) came out identical; biomes took 4.7 ms per chunk instead of
+  58 ms, and the same land area generated at 47 chunks/s instead of 13. Vanilla biome sources
+  are left alone. New setting `fastModdedBiomes` (on) turns it off if a biome mod misbehaves.
+  Chunks being that much cheaper changes the best speed setting, so a world tuned before this
+  tunes again once, the next time you are away. In a full 26.3 pack (C2ME, Lithosphere,
+  Biolith biomes, Streams Reflowing) a 125x125-chunk full-detail area took 2:35 instead of 4:20.
+
+- **Fixed: `/farground area` never said it was done.** A finished area waited for every chunk
+  in the dimension to be idle, but generation around you starts meanwhile and keeps chunks in
+  progress, so the "done" message never came and a second queued area never started. It now
+  waits only for its own chunks.
+
+- **No access widener any more** (Fabric). Its one entry, the non-blocking chunk request, is
+  now called through a method handle. With an access widener, Loom rewrites the Minecraft jar
+  on every fresh build, and on-access antivirus such as Bitdefender blocks that by holding the
+  new jar open, so the mod couldn't be built on those PCs. No change in game.
+
+- **Quieter progress line.** Once everything in range is done, it no longer pops up for the small
+  strips of new land that come into range as you move around. It comes back if you travel far
+  enough to leave a real job (under 75% of your range done and over 20,000 chunks to go), and for
+  area jobs, pausing and speed tuning.
+
 ## 1.10.0 - time-left estimate, fixed dark distant terrain
 - **Fixed: distant terrain drawn black with Voxy** ([#1](https://github.com/Benny1526/farground/issues/1)).
   Snow-covered land was the worst: snow layers, paths and other thin blocks counted as solid

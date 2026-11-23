@@ -1,5 +1,10 @@
 # Publishing Farground on CurseForge
 
+> **This is the first-time setup guide** (creating the project page). For a new release, use
+> `curseforge-kit/CHECKLIST.md` and `RELEASE-<version>.md` instead. The file names and the Beta channel
+> below are from the first upload (1.7.0); releases since 1.9.0 use the Release channel and
+> include NeoForge jars.
+
 ## Before you start
 - Farground needs **Voxy or Distant Horizons**. Distant Horizons is on CurseForge, so it can
   be listed as a dependency. **Voxy is not** (it's Modrinth-only), so the description tells

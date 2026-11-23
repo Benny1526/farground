@@ -12,6 +12,9 @@ iconFile = "assets/farground/icon.png"
 displayURL = "https://github.com/Benny1526/farground"
 description = '''Fast background terrain generator for Distant Horizons. Fills in distant terrain around you, nearest first, and stays out of the way while you play. Singleplayer, LAN, and dedicated servers.'''
 
+[[mixins]]
+config = "farground.mixins.json"
+
 [[accessTransformers]]
 file = "META-INF/accesstransformer.cfg"
 

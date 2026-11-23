@@ -8,12 +8,12 @@
 	"license": "MIT",
 	"icon": "assets/farground/icon.png",
 	"environment": "*",
-	"accessWidener": "farground.accesswidener",
 	"entrypoints": {
 		"main": ["dev.farground.fabric.FargroundFabric"],
 		"client": ["dev.farground.fabric.FargroundFabricClient"],
 		"modmenu": ["dev.farground.fabric.FargroundModMenu"]
 	},
+	"mixins": ["farground.mixins.json"],
 	"depends": {
 		"fabricloader": ">=0.18.0",
 		"minecraft": "${minecraft_range}",

@@ -14,9 +14,25 @@ versionFile.withInputStream { v.load(it) }
 version = "${project.version}+${mcTarget}"
 
 loom {
-	accessWidenerPath = file("src/main/resources/farground.accesswidener")
+	// No access widener, and none of the dependencies' access wideners or injected interfaces:
+	// with any of them, Loom rewrites the Minecraft jar in place on every fresh build, which
+	// on-access antivirus (seen with Bitdefender) blocks by holding the new jar open. Farground
+	// uses none of them; its one private Minecraft method goes through a method handle instead.
+	enableTransitiveAccessWideners = false
+	interfaceInjection {
+		enableDependencyInterfaceInjection = false
+	}
 }
 base.archivesName = 'farground'
+
+// Code and mixins that only exist for one Minecraft version (src/mc26.3: batched biome climate,
+// which uses an API 26.2 doesn't have). The NeoForge build adds the same folders.
+sourceSets {
+	main {
+		java { srcDir "src/mc${mcTarget}/java" }
+		resources { srcDir "src/mc${mcTarget}/resources" }
+	}
+}
 
 repositories {
 	exclusiveContent {

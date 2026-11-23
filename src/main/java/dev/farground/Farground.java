@@ -36,6 +36,9 @@ public final class Farground {
 	public static volatile Tr.Msg lastPrune;
 	private static Path pruneRoot;
 	private static List<Path> pruneDirs;
+	/** Region folders to shrink once the world has closed, and the most time that may take. */
+	private static List<Path> compactDirs;
+	private static final long COMPACT_MAX_MILLIS = 20_000;
 
 	private Farground() {}
 
@@ -60,7 +63,15 @@ public final class Farground {
 	public static void serverStopping(MinecraftServer server) {
 		Generator g = generator;
 		generator = null;
-		if (g != null) g.stop();
+		if (g != null) {
+			g.stop();
+			// Far chunks were removed: their region files get shrunk once everything is saved.
+			Path root = server.getWorldPath(LevelResource.ROOT);
+			compactDirs = new ArrayList<>();
+			for (var dim : g.dimensionsWithRemovedChunks()) {
+				compactDirs.add(DimensionType.getStorageFolder(dim, root).resolve("region"));
+			}
+		}
 		if (pruneRequested) {
 			// Remember where the chunk files are; the prune itself runs once everything is saved.
 			pruneRoot = server.getWorldPath(LevelResource.ROOT);
@@ -72,6 +83,21 @@ public final class Farground {
 	}
 
 	public static void serverStopped(MinecraftServer server) {
+		runPrune();
+		List<Path> dirs = compactDirs;
+		compactDirs = null;
+		if (dirs == null || dirs.isEmpty()) return;
+		try {
+			long t = System.nanoTime();
+			Pruner.Compacted c = Pruner.compact(dirs, COMPACT_MAX_MILLIS);
+			LOG.info("Shrank {} region files from {} MB to {} MB in {} ms", c.files(),
+					c.bytesBefore() / 1_000_000, c.bytesAfter() / 1_000_000, (System.nanoTime() - t) / 1_000_000);
+		} catch (Exception e) {
+			LOG.warn("Could not shrink region files", e); // they stay valid, only larger
+		}
+	}
+
+	private static void runPrune() {
 		if (!pruneRequested || pruneRoot == null) return;
 		pruneRequested = false;
 		try {

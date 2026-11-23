@@ -1,0 +1,118 @@
+name: Bug report
+description: Something doesn't work, crashes, or looks wrong in the distance.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! The more of this you fill in, the faster it can be fixed.
+        Tip: `/farground status` in-game shows most of what's asked below.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you saw, and what you expected instead. Screenshots help a lot for anything visual.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen
+      description: Steps from opening the game, if you know them. "It happens after a while" is fine too.
+      placeholder: |
+        1. Create a new world
+        2. Stand still for a minute
+        3. ...
+    validations:
+      required: false
+
+  - type: input
+    id: farground-version
+    attributes:
+      label: Farground version
+      description: From the jar name, for example `farground-1.11.0+26.3.jar`.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: minecraft
+    attributes:
+      label: Minecraft version
+      options:
+        - "26.3"
+        - "26.2"
+        - Other (say which below)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: loader
+    attributes:
+      label: Loader
+      options:
+        - Fabric
+        - NeoForge
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: lod
+    attributes:
+      label: LOD mod
+      options:
+        - label: Voxy
+        - label: Distant Horizons
+
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where does it happen?
+      options:
+        - Singleplayer
+        - LAN
+        - Dedicated server
+    validations:
+      required: true
+
+  - type: dropdown
+    id: c2me
+    attributes:
+      label: Is C2ME installed?
+      options:
+        - "No"
+        - "Yes"
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: mods
+    attributes:
+      label: Other mods
+      description: |
+        A modpack name and version is enough. Otherwise list the worldgen and performance
+        mods (terrain, biomes, structures, chunk loading, Lithium, ModernFix and so on).
+    validations:
+      required: false
+
+  - type: input
+    id: log
+    attributes:
+      label: Log
+      description: |
+        Upload `logs/latest.log` (from the game folder, right after the problem) to
+        [mclo.gs](https://mclo.gs) or a GitHub gist, and paste the link. For a crash, also
+        the file from `crash-reports/`.
+      placeholder: https://mclo.gs/...
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Your settings if you changed them (`config/farground.json`), a spark profile link for slowness, and so on.
+    validations:
+      required: false
